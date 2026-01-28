@@ -8,7 +8,7 @@ Operator learning task: kappa(x,y) -> u(x,y)
 """
 
 import numpy as np
-from scipy.sparse.linalg import cg, LinearOperator
+from scipy.sparse.linalg import LinearOperator, cg
 
 from pdeforge.core.base import PDEModel
 
@@ -16,9 +16,9 @@ from pdeforge.core.base import PDEModel
 _clip_positive = lambda x: np.maximum(x, 1e-6)
 from pdeforge.core.registry import register_model
 from pdeforge.generators.initial_conditions import (
-    get_ic_generator,
-    SigmoidTransformGenerator,
     GaussianRandomFieldGenerator,
+    SigmoidTransformGenerator,
+    get_ic_generator,
 )
 
 
@@ -75,7 +75,7 @@ class Darcy2D(PDEModel):
         dkappa_dx = np.fft.ifft2(1j * self.KX * kappa_hat).real
         dkappa_dy = np.fft.ifft2(1j * self.KY * kappa_hat).real
 
-        result = -kappa*lap_u - (dkappa_dx*du_dx + dkappa_dy*du_dy)
+        result = -kappa * lap_u - (dkappa_dx * du_dx + dkappa_dy * du_dy)
 
         return result.flatten()
 
@@ -103,21 +103,22 @@ class Darcy2D(PDEModel):
 
         # scipy 1.14+ uses rtol, older uses tol
         import scipy
+
         cg_kwargs = {
-            'x0': u0,
-            'maxiter': self.params["cg_maxiter"],
+            "x0": u0,
+            "maxiter": self.params["cg_maxiter"],
         }
-        if tuple(map(int, scipy.__version__.split('.')[:2])) >= (1, 14):
-            cg_kwargs['rtol'] = self.params["cg_tol"]
+        if tuple(map(int, scipy.__version__.split(".")[:2])) >= (1, 14):
+            cg_kwargs["rtol"] = self.params["cg_tol"]
         else:
-            cg_kwargs['tol'] = self.params["cg_tol"]
+            cg_kwargs["tol"] = self.params["cg_tol"]
         u, info = cg(A, b, **cg_kwargs)
 
         u = u.reshape((self.ny, self.nx))
         u = u - u.mean()  # zero mean
 
         if return_info:
-            return u, {'cg_converged': info == 0}
+            return u, {"cg_converged": info == 0}
         return u
 
     def generate_ic(self, generator="sigmoid", generator_params=None, seed=None):
@@ -125,7 +126,7 @@ class Darcy2D(PDEModel):
         Generate random permeability field.
         Uses sigmoid transform to ensure kappa in [kappa_min, kappa_max].
         """
-        if generator_params==None:
+        if generator_params == None:
             generator_params = {}
 
         if generator == "sigmoid" or generator == "default":
@@ -153,8 +154,5 @@ class Darcy2D(PDEModel):
         return kappa
 
     def validate_solution(self, kappa, u, tol=1e-6):
-        is_valid = (
-            not np.isnan(u).any() and
-            not np.isinf(u).any()
-        )
-        return {'valid': is_valid}
+        is_valid = not np.isnan(u).any() and not np.isinf(u).any()
+        return {"valid": is_valid}

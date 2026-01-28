@@ -2,9 +2,9 @@
 
 from pdeforge.visualization.interactive import (
     DatasetExplorer,
-    preview_samples,
     plot_sample_1d,
     plot_sample_2d,
+    preview_samples,
 )
 
 __all__ = [

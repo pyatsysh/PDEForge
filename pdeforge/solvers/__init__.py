@@ -27,11 +27,14 @@ try:
         create_simple_rectangle,
         mark_boundaries_rectangle,
     )
-    __all__.extend([
-        "create_rectangle_with_hole",
-        "create_simple_rectangle",
-        "mark_boundaries_rectangle",
-    ])
+
+    __all__.extend(
+        [
+            "create_rectangle_with_hole",
+            "create_simple_rectangle",
+            "mark_boundaries_rectangle",
+        ]
+    )
 except ImportError:
     # FEniCSx not available
     pass

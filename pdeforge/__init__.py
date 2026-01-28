@@ -2,29 +2,44 @@
 PDEForge: generate PDE datasets for operator learning.
 """
 
-from pdeforge.core.registry import register_model, get_model, list_models, describe_model, describe_all_models
+# import models to trigger registration
+from pdeforge import models as _models
 from pdeforge.core.base import PDEModel
-from pdeforge.core.types import PDEDataset, Domain, GridSpec
+from pdeforge.core.registry import (
+    describe_all_models,
+    describe_model,
+    get_model,
+    list_models,
+    register_model,
+)
+from pdeforge.core.types import Domain, GridSpec, PDEDataset
+from pdeforge.exploration import (
+    explore_model,
+    explore_parameter,
+    explore_parameter_grid,
+    visualize_parameter_effect,
+)
 from pdeforge.generators.initial_conditions import (
     FourierICGenerator,
     GaussianRandomFieldGenerator,
 )
-from pdeforge.exploration import (
-    explore_parameter,
-    explore_parameter_grid,
-    explore_model,
-    visualize_parameter_effect,
-)
-
-# import models to trigger registration
-from pdeforge import models as _models
 
 _LARGE_DATASET_THRESHOLD = 5000
 
 
-def generate_dataset(model, n_samples, resolution, domain=None, params=None,
-                     ic_generator="fourier", ic_params=None, seed=None,
-                     validate=True, n_jobs=1, verbose=True):
+def generate_dataset(
+    model,
+    n_samples,
+    resolution,
+    domain=None,
+    params=None,
+    ic_generator="fourier",
+    ic_params=None,
+    seed=None,
+    validate=True,
+    n_jobs=1,
+    verbose=True,
+):
     """
     Generate dataset from a PDE model.
 
@@ -38,10 +53,11 @@ def generate_dataset(model, n_samples, resolution, domain=None, params=None,
     # tip for large datasets
     if verbose and n_samples >= _LARGE_DATASET_THRESHOLD:
         import sys
+
         print(
             f"Generating {n_samples:,} samples... This may take a while.\n"
             f"Tip: save with dataset.save('./my_data') for reuse.",
-            file=sys.stderr
+            file=sys.stderr,
         )
 
     model_cls = get_model(model)
@@ -53,11 +69,7 @@ def generate_dataset(model, n_samples, resolution, domain=None, params=None,
     if ic_params is None:
         ic_params = {}
 
-    pde_model = model_cls(
-        resolution=resolution,
-        domain=domain,
-        **params
-    )
+    pde_model = model_cls(resolution=resolution, domain=domain, **params)
 
     return pde_model.generate_dataset(
         n_samples=n_samples,

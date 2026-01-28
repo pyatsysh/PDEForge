@@ -5,11 +5,12 @@ Models expose physical params (viscosity, Re, etc) but hide solver internals.
 """
 
 from abc import ABC, abstractmethod
+
 import numpy as np
 from tqdm import tqdm
 
-from pdeforge.core.types import PDEDataset, Domain, GridSpec
 from pdeforge.core.params import ParamSpec, ParamType, describe_params
+from pdeforge.core.types import Domain, GridSpec, PDEDataset
 
 
 class PDEModel(ABC):
@@ -54,7 +55,7 @@ class PDEModel(ABC):
         resolution: grid points per dim, e.g. {"x": 256}
         domain: bounds per dim, defaults to unit domain
         """
-        if domain==None:
+        if domain == None:
             domain = {k: (0.0, 1.0) for k in resolution.keys()}
 
         self.domain = Domain(bounds=domain)
@@ -77,14 +78,17 @@ class PDEModel(ABC):
         pass
 
     def validate_solution(self, ic, solution, tol=1e-6):
-        is_valid = (
-            not np.isnan(solution).any() and
-            not np.isinf(solution).any()
-        )
-        return {'valid': is_valid}
+        is_valid = not np.isnan(solution).any() and not np.isinf(solution).any()
+        return {"valid": is_valid}
 
-    def generate_sample(self, generator="fourier", generator_params=None,
-                        seed=None, validate=True, max_attempts=10):
+    def generate_sample(
+        self,
+        generator="fourier",
+        generator_params=None,
+        seed=None,
+        validate=True,
+        max_attempts=10,
+    ):
         """
         Generate single (input, output) sample.
         Returns (ic, solution, info) tuple.
@@ -105,15 +109,23 @@ class PDEModel(ABC):
 
             if validate:
                 validation = self.validate_solution(ic, solution)
-                if validation['valid']:
+                if validation["valid"]:
                     return ic, solution, validation
             else:
-                return ic, solution, {'valid': True}
+                return ic, solution, {"valid": True}
 
         raise RuntimeError("sample generation failed")
 
-    def generate_dataset(self, n_samples, ic_generator="fourier", ic_params=None,
-                         seed=None, validate=True, n_jobs=1, verbose=True):
+    def generate_dataset(
+        self,
+        n_samples,
+        ic_generator="fourier",
+        ic_params=None,
+        seed=None,
+        validate=True,
+        n_jobs=1,
+        verbose=True,
+    ):
         """
         Generate dataset of (input, output) pairs.
 
@@ -122,7 +134,7 @@ class PDEModel(ABC):
         seed: random seed for reproducability
         n_jobs: parallel workers (not fully implemented yet)
         """
-        if ic_params==None:
+        if ic_params == None:
             ic_params = {}
 
         inputs = []
@@ -133,7 +145,9 @@ class PDEModel(ABC):
             np.random.seed(seed)
         seeds = [np.random.randint(0, 2**31) for _ in range(n_samples)]
 
-        iterator = tqdm(range(n_samples), disable=not verbose, desc="Generating samples")
+        iterator = tqdm(
+            range(n_samples), disable=not verbose, desc="Generating samples"
+        )
 
         # sequential for now, parallel TODO
         for i in iterator:
@@ -150,14 +164,14 @@ class PDEModel(ABC):
         outputs = np.stack(outputs, axis=0)
 
         metadata = {
-            'model': getattr(self, '_registered_name', self.__class__.__name__),
-            'n_samples': n_samples,
-            'resolution': dict(self.grid_spec.resolution),
-            'domain': {k: list(v) for k, v in self.domain.bounds.items()},
-            'params': self.params,
-            'ic_generator': ic_generator if isinstance(ic_generator, str) else 'custom',
-            'ic_params': ic_params,
-            'seed': seed,
+            "model": getattr(self, "_registered_name", self.__class__.__name__),
+            "n_samples": n_samples,
+            "resolution": dict(self.grid_spec.resolution),
+            "domain": {k: list(v) for k, v in self.domain.bounds.items()},
+            "params": self.params,
+            "ic_generator": ic_generator if isinstance(ic_generator, str) else "custom",
+            "ic_params": ic_params,
+            "seed": seed,
         }
 
         return PDEDataset(

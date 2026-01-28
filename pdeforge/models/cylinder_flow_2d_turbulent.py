@@ -22,26 +22,40 @@ BCs: Parabolic inlet, zero-stress outlet, no-slip walls and cylinder.
 Operator learning task: (inlet_velocity_scale, cx, cy) -> (u, v, p) time series
 """
 
-import numpy as np
-from typing import Dict, Tuple, Optional, List
+from typing import Dict, List, Optional, Tuple
 
-from pdeforge.core.registry import register_model
+import numpy as np
+
 from pdeforge.core.params import ParamSpec, ParamType
+from pdeforge.core.registry import register_model
 
 # Check FEniCSx
 try:
+    import basix
     import dolfinx
-    from dolfinx import fem, mesh as dfx_mesh, io
-    from dolfinx.fem.petsc import LinearProblem, NonlinearProblem
     import ufl
-    from ufl import (
-        inner, grad, div, dx, ds, dot, sqrt, tr,
-        TrialFunction, TestFunction, split, FacetNormal,
-        sym, Identity, nabla_grad
-    )
+    from dolfinx import fem, io
+    from dolfinx import mesh as dfx_mesh
+    from dolfinx.fem.petsc import LinearProblem, NonlinearProblem
     from mpi4py import MPI
     from petsc4py import PETSc
-    import basix
+    from ufl import (
+        FacetNormal,
+        Identity,
+        TestFunction,
+        TrialFunction,
+        div,
+        dot,
+        ds,
+        dx,
+        grad,
+        inner,
+        nabla_grad,
+        split,
+        sqrt,
+        sym,
+        tr,
+    )
 
     from pdeforge.core.fenics_base import FEniCSModel
     from pdeforge.solvers.fenics_utils import create_rectangle_with_hole
@@ -55,6 +69,7 @@ except ImportError:
 
 
 if HAS_FENICSX:
+
     @register_model("cylinder_flow_2d_turbulent")
     class CylinderFlow2DTurbulent(FEniCSModel):
         """
@@ -202,8 +217,12 @@ if HAS_FENICSX:
         def __init__(self, resolution, domain=None, **params):
             # Set domain from channel geometry if not provided
             if domain is None:
-                L = params.get("_channel_length", self.DEFAULT_PARAMS["_channel_length"])
-                H = params.get("_channel_height", self.DEFAULT_PARAMS["_channel_height"])
+                L = params.get(
+                    "_channel_length", self.DEFAULT_PARAMS["_channel_length"]
+                )
+                H = params.get(
+                    "_channel_height", self.DEFAULT_PARAMS["_channel_height"]
+                )
                 domain = {"x": (0.0, L), "y": (0.0, H)}
 
             # Store geometry params BEFORE super().__init__
@@ -254,11 +273,10 @@ if HAS_FENICSX:
 
             self.V = fem.functionspace(
                 self.mesh,
-                basix.ufl.element("Lagrange", self.mesh.basix_cell(), 2, shape=(2,))
+                basix.ufl.element("Lagrange", self.mesh.basix_cell(), 2, shape=(2,)),
             )
             self.Q = fem.functionspace(
-                self.mesh,
-                basix.ufl.element("Lagrange", self.mesh.basix_cell(), 1)
+                self.mesh, basix.ufl.element("Lagrange", self.mesh.basix_cell(), 1)
             )
 
         def _recreate_mesh_and_spaces(self, cx, cy):
@@ -341,7 +359,7 @@ if HAS_FENICSX:
             def inlet_velocity(x):
                 U_max_local = 1.5 * self.U_mean * inlet_scale
                 values = np.zeros((2, x.shape[1]))
-                values[0] = 4 * U_max_local * x[1] * (self.H - x[1]) / (self.H ** 2)
+                values[0] = 4 * U_max_local * x[1] * (self.H - x[1]) / (self.H**2)
                 return values
 
             def no_slip(x):
@@ -377,11 +395,11 @@ if HAS_FENICSX:
             # Time-stepping scheme: Backward Euler
             # Functions
             w_n = fem.Function(W)  # Solution at previous time
-            w = fem.Function(W)    # Solution at current time
+            w = fem.Function(W)  # Solution at current time
 
-            (u_n, p_n) = ufl.split(w_n)
-            (u, p) = ufl.split(w)
-            (v, q) = ufl.TestFunctions(W)
+            u_n, p_n = ufl.split(w_n)
+            u, p = ufl.split(w)
+            v, q = ufl.TestFunctions(W)
 
             # Time step
             k = fem.Constant(self.mesh, PETSc.ScalarType(dt))
@@ -429,11 +447,9 @@ if HAS_FENICSX:
                     u_grid = self.interpolate_to_grid(u_sol, fill_value=0.0)
                     p_grid = self.interpolate_to_grid(p_sol, fill_value=0.0)
 
-                    frame = np.stack([
-                        u_grid[:, :, 0],
-                        u_grid[:, :, 1],
-                        p_grid
-                    ], axis=-1)
+                    frame = np.stack(
+                        [u_grid[:, :, 0], u_grid[:, :, 1], p_grid], axis=-1
+                    )
                     trajectory.append(frame)
                     output_idx += 1
 
@@ -443,7 +459,9 @@ if HAS_FENICSX:
                 # Solve nonlinear problem
                 try:
                     problem = NonlinearProblem(
-                        F, w, bcs=bcs,
+                        F,
+                        w,
+                        bcs=bcs,
                         petsc_options_prefix="ns_turb_",
                         petsc_options={
                             "snes_type": "newtonls",
@@ -454,7 +472,7 @@ if HAS_FENICSX:
                             "ksp_type": "preonly",
                             "pc_type": "lu",
                             "pc_factor_mat_solver_type": "mumps",
-                        }
+                        },
                     )
                     w = problem.solve()
                 except Exception:
@@ -476,7 +494,7 @@ if HAS_FENICSX:
             def inlet_velocity(x):
                 U_max = 1.5 * self.U_mean * inlet_scale
                 values = np.zeros((2, x.shape[1]))
-                values[0] = 4 * U_max * x[1] * (self.H - x[1]) / (self.H ** 2)
+                values[0] = 4 * U_max * x[1] * (self.H - x[1]) / (self.H**2)
                 return values
 
             def no_slip(x):
@@ -508,8 +526,8 @@ if HAS_FENICSX:
             bcs = [bc_inlet, bc_walls, bc_cylinder]
 
             # Solve Stokes
-            (u, p) = ufl.split(w)
-            (v, q) = ufl.TestFunctions(W)
+            u, p = ufl.split(w)
+            v, q = ufl.TestFunctions(W)
 
             F = (
                 self.nu * inner(grad(u), grad(v)) * dx
@@ -518,7 +536,7 @@ if HAS_FENICSX:
             )
 
             u_trial = TrialFunction(W)
-            (u_t, p_t) = ufl.split(u_trial)
+            u_t, p_t = ufl.split(u_trial)
 
             a = (
                 self.nu * inner(grad(u_t), grad(v)) * dx
@@ -528,13 +546,15 @@ if HAS_FENICSX:
             L_form = fem.Constant(self.mesh, PETSc.ScalarType(0.0)) * q * dx
 
             problem = LinearProblem(
-                a, L_form, bcs=bcs,
+                a,
+                L_form,
+                bcs=bcs,
                 petsc_options_prefix="stokes_init_",
                 petsc_options={
                     "ksp_type": "preonly",
                     "pc_type": "lu",
                     "pc_factor_mat_solver_type": "mumps",
-                }
+                },
             )
             w_init = problem.solve()
             w.x.array[:] = w_init.x.array[:]
@@ -556,8 +576,14 @@ if HAS_FENICSX:
 
             return np.array([scale, cx, cy])
 
-        def generate_sample(self, generator="default", generator_params=None,
-                           seed=None, validate=True, max_attempts=3):
+        def generate_sample(
+            self,
+            generator="default",
+            generator_params=None,
+            seed=None,
+            validate=True,
+            max_attempts=3,
+        ):
             """Generate single (input, output) sample."""
             if generator_params is None:
                 generator_params = {}
@@ -580,10 +606,10 @@ if HAS_FENICSX:
 
                     if validate:
                         validation = self.validate_solution(inputs, trajectory)
-                        if validation['valid']:
+                        if validation["valid"]:
                             return inputs, trajectory, validation
                     else:
-                        return inputs, trajectory, {'valid': True}
+                        return inputs, trajectory, {"valid": True}
 
                 except Exception as e:
                     if attempt == max_attempts - 1:
@@ -594,10 +620,7 @@ if HAS_FENICSX:
 
         def validate_solution(self, inputs, trajectory, tol=1e-6):
             """Validate solution trajectory."""
-            is_valid = (
-                not np.isnan(trajectory).any() and
-                not np.isinf(trajectory).any()
-            )
+            is_valid = not np.isnan(trajectory).any() and not np.isinf(trajectory).any()
 
             # Compute max velocity over all time steps
             u_all = trajectory[:, :, :, 0]
@@ -605,10 +628,10 @@ if HAS_FENICSX:
             vmag_max = np.sqrt(u_all**2 + v_all**2).max()
 
             return {
-                'valid': is_valid,
-                'max_velocity': vmag_max,
-                'cylinder_position': (inputs[1], inputs[2]),
-                'reynolds_number': self.Re * inputs[0],
+                "valid": is_valid,
+                "max_velocity": vmag_max,
+                "cylinder_position": (inputs[1], inputs[2]),
+                "reynolds_number": self.Re * inputs[0],
             }
 
         def get_reynolds_number(self, inlet_scale=1.0):

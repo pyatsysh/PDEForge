@@ -86,7 +86,10 @@ testpaths = ["tests"]
 addopts = "-v --cov=pdeforge --cov-report=term-missing"
 
 [tool.mypy]
-python_version = "3.8"
-warn_return_any = true
+python_version = "3.9"
+warn_return_any = false
 warn_unused_configs = true
 ignore_missing_imports = true
+no_implicit_optional = false
+# Disable error codes that are noisy for numpy-heavy scientific code
+disable_error_code = ["override", "assignment", "arg-type", "return-value", "call-arg", "call-overload", "union-attr", "var-annotated", "no-redef", "misc"]

@@ -11,13 +11,14 @@ Operator Learning Task:
     u(x, y, t=0) → u(x, y, t=T)
 """
 
+from typing import Callable, Dict, Optional, Tuple, Union
+
 import numpy as np
-from typing import Dict, Tuple, Optional, Union, Callable
 
 from pdeforge.core.base import PDEModel
+from pdeforge.core.params import ParamSpec, ParamType
 from pdeforge.core.registry import register_model
 from pdeforge.core.types import PDEDataset
-from pdeforge.core.params import ParamSpec, ParamType
 from pdeforge.generators.initial_conditions import get_ic_generator
 
 
@@ -25,11 +26,11 @@ from pdeforge.generators.initial_conditions import get_ic_generator
 class Heat2D(PDEModel):
     """
     2D Heat equation for diffusion processes.
-    
+
     ∂u/∂t = α ∇²u
-    
+
     Solutions smooth out isotropically over time.
-    
+
     Examples
     --------
     >>> dataset = generate_dataset(
@@ -39,11 +40,11 @@ class Heat2D(PDEModel):
     ...     params={"diffusivity": 0.01, "time_end": 1.0},
     ... )
     """
-    
+
     NDIM = 2
     INPUT_NAMES = ["u0"]
     OUTPUT_NAMES = ["u_T"]
-    
+
     USER_PARAMS = [
         ParamSpec(
             name="diffusivity",
@@ -64,29 +65,29 @@ class Heat2D(PDEModel):
             affects="Longer time → smoother solution",
         ),
     ]
-    
+
     DEFAULT_PARAMS = {
         "diffusivity": 0.01,
         "time_end": 1.0,
         "_n_time_steps": 101,
         "_dt": None,
     }
-    
+
     def __init__(
         self,
         resolution: Dict[str, int],
         domain: Dict[str, Tuple[float, float]] = None,
-        **params
+        **params,
     ):
         super().__init__(resolution, domain, **params)
-        
+
         self.alpha = self.params["diffusivity"]
         self.T = self.params.get("time_end", 1.0)
         self.n_t = self.params.get("_n_time_steps", 101)
-        
+
         self.nx = resolution["x"]
         self.ny = resolution["y"]
-        
+
         # Wavenumbers
         dx = self.grids["x"][1] - self.grids["x"][0]
         dy = self.grids["y"][1] - self.grids["y"][0]
@@ -94,18 +95,18 @@ class Heat2D(PDEModel):
         ky = 2 * np.pi * np.fft.fftfreq(self.ny, d=dy)
         self.KX, self.KY = np.meshgrid(kx, ky)
         self.K2 = self.KX**2 + self.KY**2
-    
+
     def solve(self, ic: np.ndarray, return_full: bool = False) -> np.ndarray:
         """
         Solve using exact solution in Fourier space.
-        
+
         For heat equation: û(k,t) = û(k,0) * exp(-α|k|²t)
         """
         t_array = np.linspace(0, self.T, self.n_t)
-        
+
         # Transform IC
         u_hat_0 = np.fft.fft2(ic)
-        
+
         if return_full:
             solutions = []
             for t in t_array:
@@ -118,7 +119,7 @@ class Heat2D(PDEModel):
             # Final time only
             u_hat_T = u_hat_0 * np.exp(-self.alpha * self.K2 * self.T)
             return np.fft.ifft2(u_hat_T).real
-    
+
     def generate_ic(
         self,
         generator: Union[str, Callable] = "fourier",
@@ -128,21 +129,21 @@ class Heat2D(PDEModel):
         """Generate random 2D initial conditions."""
         if generator_params is None:
             generator_params = {}
-        
+
         default_params = {
             "n_modes": 8,
             "decay": 2.0,
             "amplitude": 1.0,
         }
         generator_params = {**default_params, **generator_params}
-        
+
         if isinstance(generator, str):
             gen = get_ic_generator(generator, **generator_params)
         else:
             gen = generator
-        
+
         return gen.generate(shape=(self.ny, self.nx), seed=seed, grid=self.grids)
-    
+
     def validate_solution(
         self,
         ic: np.ndarray,
@@ -150,8 +151,5 @@ class Heat2D(PDEModel):
         tol: float = 1e-6,
     ) -> Dict:
         """Validate the solution."""
-        is_valid = (
-            not np.isnan(solution).any() and
-            not np.isinf(solution).any()
-        )
-        return {'valid': is_valid, 'max_value': np.abs(solution).max()}
+        is_valid = not np.isnan(solution).any() and not np.isinf(solution).any()
+        return {"valid": is_valid, "max_value": np.abs(solution).max()}

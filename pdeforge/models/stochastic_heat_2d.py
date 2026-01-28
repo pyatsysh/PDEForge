@@ -14,13 +14,14 @@ Operator Learning Tasks:
 with periodic boundary conditions.
 """
 
+from typing import Callable, Dict, Optional, Tuple, Union
+
 import numpy as np
-from typing import Dict, Tuple, Optional, Union, Callable
 
 from pdeforge.core.base import PDEModel
+from pdeforge.core.params import ParamSpec, ParamType
 from pdeforge.core.registry import register_model
 from pdeforge.core.types import PDEDataset
-from pdeforge.core.params import ParamSpec, ParamType
 from pdeforge.generators.initial_conditions import get_ic_generator
 
 
@@ -28,11 +29,11 @@ from pdeforge.generators.initial_conditions import get_ic_generator
 class StochasticHeat2D(PDEModel):
     """
     2D Stochastic Heat equation with additive noise.
-    
+
     ∂u/∂t = α ∇²u + σ Ẇ
-    
+
     Produces multiple realizations per initial condition.
-    
+
     Examples
     --------
     >>> dataset = generate_dataset(
@@ -43,11 +44,11 @@ class StochasticHeat2D(PDEModel):
     ... )
     >>> # dataset.outputs.shape = (50, 20, 64, 64)
     """
-    
+
     NDIM = 2
     INPUT_NAMES = ["u0"]
     OUTPUT_NAMES = ["u_T"]
-    
+
     USER_PARAMS = [
         ParamSpec(
             name="diffusivity",
@@ -84,7 +85,7 @@ class StochasticHeat2D(PDEModel):
             affects="Longer time → more noise accumulation",
         ),
     ]
-    
+
     DEFAULT_PARAMS = {
         "diffusivity": 0.01,
         "noise_intensity": 0.1,
@@ -93,104 +94,102 @@ class StochasticHeat2D(PDEModel):
         "_n_time_steps": 101,
         "_noise_correlation_length": 0.05,
     }
-    
+
     def __init__(
         self,
         resolution: Dict[str, int],
         domain: Dict[str, Tuple[float, float]] = None,
-        **params
+        **params,
     ):
         super().__init__(resolution, domain, **params)
-        
+
         self.alpha = self.params["diffusivity"]
         self.sigma = self.params["noise_intensity"]
         self.n_realizations = self.params.get("n_realizations", 20)
         self.T = self.params.get("time_end", 1.0)
         self.n_t = self.params.get("_n_time_steps", 101)
         self.corr_length = self.params.get("_noise_correlation_length", 0.05)
-        
+
         self.nx = resolution["x"]
         self.ny = resolution["y"]
-        
+
         dx = self.grids["x"][1] - self.grids["x"][0]
         dy = self.grids["y"][1] - self.grids["y"][0]
         kx = 2 * np.pi * np.fft.fftfreq(self.nx, d=dx)
         ky = 2 * np.pi * np.fft.fftfreq(self.ny, d=dy)
         self.KX, self.KY = np.meshgrid(kx, ky)
         self.K2 = self.KX**2 + self.KY**2
-        
+
         self.dt = self.T / (self.n_t - 1)
-        
+
         # Precompute noise correlation kernel
         if self.corr_length > 0:
             self.noise_kernel = np.exp(-self.K2 * self.corr_length**2 / 2)
-            self.noise_kernel = self.noise_kernel / np.sqrt(np.sum(self.noise_kernel**2) / (self.nx * self.ny))
+            self.noise_kernel = self.noise_kernel / np.sqrt(
+                np.sum(self.noise_kernel**2) / (self.nx * self.ny)
+            )
         else:
             self.noise_kernel = np.ones((self.ny, self.nx))
-    
+
     def _generate_noise_increment(self, seed: int = None) -> np.ndarray:
         """Generate 2D spatially correlated noise increment."""
         if seed is not None:
             np.random.seed(seed)
-        
+
         xi = np.random.randn(self.ny, self.nx) + 1j * np.random.randn(self.ny, self.nx)
-        noise = np.fft.ifft2(np.fft.fft2(np.random.randn(self.ny, self.nx)) * self.noise_kernel).real
-        
+        noise = np.fft.ifft2(
+            np.fft.fft2(np.random.randn(self.ny, self.nx)) * self.noise_kernel
+        ).real
+
         return noise * np.sqrt(self.dt)
-    
+
     def solve_single_realization(
-        self, 
-        ic: np.ndarray, 
-        seed: int = None,
-        return_full: bool = False
+        self, ic: np.ndarray, seed: int = None, return_full: bool = False
     ) -> np.ndarray:
         """Solve one realization."""
         if seed is not None:
             np.random.seed(seed)
-        
+
         u = ic.copy()
         solutions = [u.copy()] if return_full else None
-        
+
         # Precompute diffusion operator
         diffusion_factor = np.exp(-self.alpha * self.K2 * self.dt)
-        
+
         for step in range(1, self.n_t):
             # Diffusion step (exact in Fourier space)
             u_hat = np.fft.fft2(u)
             u_hat = u_hat * diffusion_factor
             u = np.fft.ifft2(u_hat).real
-            
+
             # Add noise
             dW = self._generate_noise_increment()
             u = u + self.sigma * dW
-            
+
             if return_full:
                 solutions.append(u.copy())
-        
+
         if return_full:
             return np.stack(solutions, axis=0)
         return u
-    
+
     def solve(
-        self, 
-        ic: np.ndarray, 
-        seed: int = None,
-        return_full: bool = False
+        self, ic: np.ndarray, seed: int = None, return_full: bool = False
     ) -> np.ndarray:
         """
         Solve with multiple realizations.
-        
+
         Returns shape: (n_realizations, ny, nx) or (n_realizations, n_t, ny, nx)
         """
         realizations = []
-        
+
         for r in range(self.n_realizations):
             realization_seed = seed + r if seed is not None else None
             u_r = self.solve_single_realization(ic, realization_seed, return_full)
             realizations.append(u_r)
-        
+
         return np.stack(realizations, axis=0)
-    
+
     def generate_ic(
         self,
         generator: Union[str, Callable] = "fourier",
@@ -200,21 +199,21 @@ class StochasticHeat2D(PDEModel):
         """Generate random 2D initial conditions."""
         if generator_params is None:
             generator_params = {}
-        
+
         default_params = {
             "n_modes": 8,
             "decay": 2.0,
             "amplitude": 1.0,
         }
         generator_params = {**default_params, **generator_params}
-        
+
         if isinstance(generator, str):
             gen = get_ic_generator(generator, **generator_params)
         else:
             gen = generator
-        
+
         return gen.generate(shape=(self.ny, self.nx), seed=seed, grid=self.grids)
-    
+
     def generate_sample(
         self,
         generator: Union[str, Callable] = "fourier",
@@ -226,15 +225,15 @@ class StochasticHeat2D(PDEModel):
         """Generate IC and multiple realizations."""
         if generator_params is None:
             generator_params = {}
-        
+
         ic = self.generate_ic(generator, generator_params, seed)
         noise_seed = seed * 1000 if seed is not None else None
         realizations = self.solve(ic, noise_seed)
-        
+
         validation = self.validate_solution(ic, realizations)
-        
+
         return ic, realizations, validation
-    
+
     def validate_solution(
         self,
         ic: np.ndarray,
@@ -242,21 +241,18 @@ class StochasticHeat2D(PDEModel):
         tol: float = 1e-6,
     ) -> Dict:
         """Validate the stochastic solution."""
-        is_valid = (
-            not np.isnan(solution).any() and
-            not np.isinf(solution).any()
-        )
-        
+        is_valid = not np.isnan(solution).any() and not np.isinf(solution).any()
+
         mean = solution.mean(axis=0)
         var = solution.var(axis=0)
-        
+
         return {
-            'valid': is_valid,
-            'n_realizations': solution.shape[0],
-            'mean_max': np.abs(mean).max(),
-            'var_max': var.max(),
+            "valid": is_valid,
+            "n_realizations": solution.shape[0],
+            "mean_max": np.abs(mean).max(),
+            "var_max": var.max(),
         }
-    
+
     def generate_dataset(
         self,
         n_samples: int,
@@ -269,17 +265,17 @@ class StochasticHeat2D(PDEModel):
     ) -> PDEDataset:
         """Generate stochastic dataset."""
         from tqdm import tqdm
-        
+
         if ic_params is None:
             ic_params = {}
-        
+
         inputs_list = []
         outputs_list = []
-        
+
         iterator = range(n_samples)
         if verbose:
             iterator = tqdm(iterator, desc="Generating stochastic samples")
-        
+
         for i in iterator:
             sample_seed = seed + i if seed is not None else None
             ic, realizations, _ = self.generate_sample(
@@ -287,10 +283,10 @@ class StochasticHeat2D(PDEModel):
             )
             inputs_list.append(ic)
             outputs_list.append(realizations)
-        
+
         inputs = np.stack(inputs_list, axis=0)
         outputs = np.stack(outputs_list, axis=0)
-        
+
         return PDEDataset(
             inputs=inputs,
             outputs=outputs,

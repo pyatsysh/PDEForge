@@ -13,22 +13,34 @@ BCs: parabolic inlet, zero-stress outlet, no-slip walls and cylinder.
 Operator learning task: inlet_velocity_scale -> (u, v, p)
 """
 
-import numpy as np
 from typing import Dict, Tuple
 
-from pdeforge.core.registry import register_model
+import numpy as np
+
 from pdeforge.core.params import ParamSpec, ParamType
+from pdeforge.core.registry import register_model
 
 # check FEniCSx
 try:
+    import basix
     import dolfinx
-    from dolfinx import fem, mesh as dfx_mesh, io
-    from dolfinx.fem.petsc import LinearProblem, NonlinearProblem
     import ufl
-    from ufl import inner, grad, div, dx, ds, TrialFunction, TestFunction, split, FacetNormal
+    from dolfinx import fem, io
+    from dolfinx import mesh as dfx_mesh
+    from dolfinx.fem.petsc import LinearProblem, NonlinearProblem
     from mpi4py import MPI
     from petsc4py import PETSc
-    import basix
+    from ufl import (
+        FacetNormal,
+        TestFunction,
+        TrialFunction,
+        div,
+        ds,
+        dx,
+        grad,
+        inner,
+        split,
+    )
 
     from pdeforge.core.fenics_base import FEniCSModel
     from pdeforge.solvers.fenics_utils import create_rectangle_with_hole
@@ -42,6 +54,7 @@ except ImportError:
 
 
 if HAS_FENICSX:
+
     @register_model("cylinder_flow_2d")
     class CylinderFlow2D(FEniCSModel):
         """
@@ -95,8 +108,12 @@ if HAS_FENICSX:
         def __init__(self, resolution, domain=None, **params):
             # set domain from channel geometry if not provided
             if domain is None:
-                L = params.get("_channel_length", self.DEFAULT_PARAMS["_channel_length"])
-                H = params.get("_channel_height", self.DEFAULT_PARAMS["_channel_height"])
+                L = params.get(
+                    "_channel_length", self.DEFAULT_PARAMS["_channel_length"]
+                )
+                H = params.get(
+                    "_channel_height", self.DEFAULT_PARAMS["_channel_height"]
+                )
                 domain = {"x": (0.0, L), "y": (0.0, H)}
 
             # store geometry params BEFORE super().__init__ calls create_mesh()
@@ -136,11 +153,10 @@ if HAS_FENICSX:
 
             self.V = fem.functionspace(
                 self.mesh,
-                basix.ufl.element("Lagrange", self.mesh.basix_cell(), 2, shape=(2,))
+                basix.ufl.element("Lagrange", self.mesh.basix_cell(), 2, shape=(2,)),
             )
             self.Q = fem.functionspace(
-                self.mesh,
-                basix.ufl.element("Lagrange", self.mesh.basix_cell(), 1)
+                self.mesh, basix.ufl.element("Lagrange", self.mesh.basix_cell(), 1)
             )
 
         def _setup_boundary_conditions(self):
@@ -151,7 +167,7 @@ if HAS_FENICSX:
             def inlet_velocity(x):
                 U_max = 1.5 * self.U_mean
                 values = np.zeros((2, x.shape[1]))
-                values[0] = 4 * U_max * x[1] * (self.H - x[1]) / (self.H ** 2)
+                values[0] = 4 * U_max * x[1] * (self.H - x[1]) / (self.H**2)
                 return values
 
             self._inlet_velocity_func = inlet_velocity
@@ -173,7 +189,7 @@ if HAS_FENICSX:
 
             def inlet_velocity(x):
                 values = np.zeros((2, x.shape[1]))
-                values[0] = 4 * U_max * x[1] * (self.H - x[1]) / (self.H ** 2)
+                values[0] = 4 * U_max * x[1] * (self.H - x[1]) / (self.H**2)
                 return values
 
             W = self.W
@@ -185,9 +201,7 @@ if HAS_FENICSX:
 
             inlet_facets = self._facet_tags.find(1)
             inlet_dofs = fem.locate_dofs_topological(
-                (W.sub(0), V),
-                self.mesh.topology.dim - 1,
-                inlet_facets
+                (W.sub(0), V), self.mesh.topology.dim - 1, inlet_facets
             )
             bc_inlet = fem.dirichletbc(inlet_bc_func, inlet_dofs, W.sub(0))
 
@@ -197,17 +211,13 @@ if HAS_FENICSX:
 
             wall_facets = self._facet_tags.find(3)
             wall_dofs = fem.locate_dofs_topological(
-                (W.sub(0), V),
-                self.mesh.topology.dim - 1,
-                wall_facets
+                (W.sub(0), V), self.mesh.topology.dim - 1, wall_facets
             )
             bc_walls = fem.dirichletbc(noslip_func, wall_dofs, W.sub(0))
 
             cylinder_facets = self._facet_tags.find(4)
             cylinder_dofs = fem.locate_dofs_topological(
-                (W.sub(0), V),
-                self.mesh.topology.dim - 1,
-                cylinder_facets
+                (W.sub(0), V), self.mesh.topology.dim - 1, cylinder_facets
             )
             bc_cylinder = fem.dirichletbc(noslip_func, cylinder_dofs, W.sub(0))
 
@@ -215,8 +225,8 @@ if HAS_FENICSX:
 
             # variational problem
             w = fem.Function(W)
-            (u, p) = ufl.split(w)
-            (v, q) = ufl.TestFunctions(W)
+            u, p = ufl.split(w)
+            v, q = ufl.TestFunctions(W)
 
             if self.params.get("_use_stokes", False):
                 # Stokes (low Re limit)
@@ -238,7 +248,7 @@ if HAS_FENICSX:
             # solve
             if self.params.get("_use_stokes", False):
                 u_trial = TrialFunction(W)
-                (u_t, p_t) = ufl.split(u_trial)
+                u_t, p_t = ufl.split(u_trial)
 
                 a = (
                     self.mu * inner(grad(u_t), grad(v)) * dx
@@ -247,16 +257,23 @@ if HAS_FENICSX:
                 )
                 L = fem.Constant(self.mesh, PETSc.ScalarType(0.0)) * q * dx
 
-                problem = LinearProblem(a, L, bcs=bcs, petsc_options={
-                    "ksp_type": "preonly",
-                    "pc_type": "lu",
-                    "pc_factor_mat_solver_type": "mumps",
-                })
+                problem = LinearProblem(
+                    a,
+                    L,
+                    bcs=bcs,
+                    petsc_options={
+                        "ksp_type": "preonly",
+                        "pc_type": "lu",
+                        "pc_factor_mat_solver_type": "mumps",
+                    },
+                )
                 w = problem.solve()
             else:
                 # dolfinx 0.10+ API uses NonlinearProblem with built-in SNES solver
                 problem = NonlinearProblem(
-                    F, w, bcs=bcs,
+                    F,
+                    w,
+                    bcs=bcs,
                     petsc_options_prefix="navier_stokes_",
                     petsc_options={
                         "snes_type": "newtonls",
@@ -266,7 +283,7 @@ if HAS_FENICSX:
                         "ksp_type": "preonly",
                         "pc_type": "lu",
                         "pc_factor_mat_solver_type": "mumps",
-                    }
+                    },
                 )
                 w = problem.solve()
                 if problem.solver.getConvergedReason() <= 0:
@@ -305,8 +322,14 @@ if HAS_FENICSX:
 
             return np.array([scale])
 
-        def generate_sample(self, generator="default", generator_params=None,
-                           seed=None, validate=True, max_attempts=10):
+        def generate_sample(
+            self,
+            generator="default",
+            generator_params=None,
+            seed=None,
+            validate=True,
+            max_attempts=10,
+        ):
             """Generate single (input, output) sample."""
             if generator_params is None:
                 generator_params = {}
@@ -325,25 +348,26 @@ if HAS_FENICSX:
 
                     if validate:
                         validation = self.validate_solution(inlet_scale, solution)
-                        if validation['valid']:
+                        if validation["valid"]:
                             return inlet_scale, solution, validation
                     else:
-                        return inlet_scale, solution, {'valid': True}
+                        return inlet_scale, solution, {"valid": True}
 
                 except Exception as e:
                     if attempt == max_attempts - 1:
                         raise
                     continue
 
-            raise RuntimeError(f"Failed to generate valid sample after {max_attempts} attempts")
-
-        def validate_solution(self, inlet_scale, solution, tol=1e-6):
-            is_valid = (
-                not np.isnan(solution).any() and
-                not np.isinf(solution).any()
+            raise RuntimeError(
+                f"Failed to generate valid sample after {max_attempts} attempts"
             )
 
+        def validate_solution(self, inlet_scale, solution, tol=1e-6):
+            is_valid = not np.isnan(solution).any() and not np.isinf(solution).any()
+
             return {
-                'valid': is_valid,
-                'max_velocity': np.sqrt(solution[:,:,0]**2 + solution[:,:,1]**2).max(),
+                "valid": is_valid,
+                "max_velocity": np.sqrt(
+                    solution[:, :, 0] ** 2 + solution[:, :, 1] ** 2
+                ).max(),
             }

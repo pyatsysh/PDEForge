@@ -5,22 +5,23 @@ This module provides utilities for solving PDEs using spectral methods
 with Fast Fourier Transform (FFT) for spatial derivatives.
 """
 
+from typing import Callable, Dict, Optional, Tuple
+
 import numpy as np
 from scipy.integrate import odeint, solve_ivp
-from typing import Callable, Tuple, Dict, Optional
 
 
 def get_wavenumbers_1d(n: int, dx: float) -> np.ndarray:
     """
     Compute wavenumbers for 1D FFT.
-    
+
     Parameters
     ----------
     n : int
         Number of grid points
     dx : float
         Grid spacing
-        
+
     Returns
     -------
     np.ndarray
@@ -34,14 +35,14 @@ def get_wavenumbers_2d(
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Compute wavenumbers for 2D FFT.
-    
+
     Parameters
     ----------
     ny, nx : int
         Number of grid points in y and x directions
     dy, dx : float
         Grid spacing in y and x directions
-        
+
     Returns
     -------
     Tuple[np.ndarray, np.ndarray]
@@ -49,13 +50,15 @@ def get_wavenumbers_2d(
     """
     kx = 2 * np.pi * np.fft.fftfreq(nx, d=dx)
     ky = 2 * np.pi * np.fft.fftfreq(ny, d=dy)
-    return np.meshgrid(ky, kx, indexing='ij')
+    return np.meshgrid(ky, kx, indexing="ij")
 
 
-def compute_fft_derivative_1d(u: np.ndarray, k: np.ndarray, order: int = 1) -> np.ndarray:
+def compute_fft_derivative_1d(
+    u: np.ndarray, k: np.ndarray, order: int = 1
+) -> np.ndarray:
     """
     Compute derivative using FFT.
-    
+
     Parameters
     ----------
     u : np.ndarray
@@ -64,7 +67,7 @@ def compute_fft_derivative_1d(u: np.ndarray, k: np.ndarray, order: int = 1) -> n
         Wavenumber array
     order : int
         Order of derivative (1, 2, etc.)
-        
+
     Returns
     -------
     np.ndarray
@@ -89,7 +92,7 @@ def compute_fft_derivative_2d(
 ) -> np.ndarray:
     """
     Compute partial derivative in 2D using FFT.
-    
+
     Parameters
     ----------
     u : np.ndarray
@@ -100,14 +103,14 @@ def compute_fft_derivative_2d(
         Dimension to differentiate ('x' or 'y')
     order : int
         Order of derivative
-        
+
     Returns
     -------
     np.ndarray
         Partial derivative of u
     """
     u_hat = np.fft.fft2(u)
-    k = kx if dim == 'x' else ky
+    k = kx if dim == "x" else ky
     du_hat = (1j * k) ** order * u_hat
     return np.fft.ifft2(du_hat).real
 
@@ -119,14 +122,14 @@ def compute_fft_laplacian_2d(
 ) -> np.ndarray:
     """
     Compute Laplacian in 2D using FFT.
-    
+
     Parameters
     ----------
     u : np.ndarray
         2D field
     kx, ky : np.ndarray
         Wavenumber meshgrids
-        
+
     Returns
     -------
     np.ndarray
@@ -141,10 +144,10 @@ def compute_fft_laplacian_2d(
 class SpectralSolver1D:
     """
     1D spectral solver for time-dependent PDEs.
-    
+
     Uses FFT for spatial derivatives and scipy's ODE integrators
     for time stepping.
-    
+
     Parameters
     ----------
     n : int
@@ -152,25 +155,25 @@ class SpectralSolver1D:
     L : float
         Domain length
     """
-    
+
     def __init__(self, n: int, L: float = 1.0):
         self.n = n
         self.L = L
         self.dx = L / n
         self.x = np.linspace(0, L, n, endpoint=False)
         self.k = get_wavenumbers_1d(n, self.dx)
-    
+
     def solve(
         self,
         rhs_func: Callable,
         u0: np.ndarray,
         t_span: Tuple[float, float],
         n_t: int = 101,
-        method: str = 'RK45',
+        method: str = "RK45",
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Solve the PDE.
-        
+
         Parameters
         ----------
         rhs_func : Callable
@@ -183,17 +186,17 @@ class SpectralSolver1D:
             Number of time points to output
         method : str
             ODE solver method
-            
+
         Returns
         -------
         Tuple[np.ndarray, np.ndarray]
             (t, u) where t is time array and u is solution array of shape (n_t, n)
         """
         t_eval = np.linspace(t_span[0], t_span[1], n_t)
-        
+
         def rhs_wrapper(t, u):
             return rhs_func(t, u, self.k)
-        
+
         # Try solve_ivp first, fall back to odeint if needed
         try:
             sol = solve_ivp(
@@ -209,7 +212,7 @@ class SpectralSolver1D:
             # Fall back to odeint
             def rhs_odeint(u, t):
                 return rhs_func(t, u, self.k)
-            
+
             u = odeint(rhs_odeint, u0, t_eval, mxstep=5000)
             return t_eval, u
 
@@ -217,9 +220,9 @@ class SpectralSolver1D:
 class SpectralSolver2D:
     """
     2D spectral solver for steady-state or time-dependent PDEs.
-    
+
     Uses FFT for spatial derivatives.
-    
+
     Parameters
     ----------
     ny, nx : int
@@ -227,7 +230,7 @@ class SpectralSolver2D:
     Ly, Lx : float
         Domain size in y and x directions
     """
-    
+
     def __init__(
         self,
         ny: int,
@@ -241,38 +244,38 @@ class SpectralSolver2D:
         self.Lx = Lx
         self.dy = Ly / ny
         self.dx = Lx / nx
-        
+
         # Create grids
         self.x = np.linspace(0, Lx, nx, endpoint=False)
         self.y = np.linspace(0, Ly, ny, endpoint=False)
         self.X, self.Y = np.meshgrid(self.x, self.y)
-        
+
         # Wavenumbers
         self.kx = 2 * np.pi * np.fft.fftfreq(nx, d=self.dx)
         self.ky = 2 * np.pi * np.fft.fftfreq(ny, d=self.dy)
         self.KX, self.KY = np.meshgrid(self.kx, self.ky)
         self.K2 = self.KX**2 + self.KY**2
-    
+
     def gradient(self, u: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """Compute gradient of u."""
         u_hat = np.fft.fft2(u)
         du_dx = np.fft.ifft2(1j * self.KX * u_hat).real
         du_dy = np.fft.ifft2(1j * self.KY * u_hat).real
         return du_dx, du_dy
-    
+
     def laplacian(self, u: np.ndarray) -> np.ndarray:
         """Compute Laplacian of u."""
         u_hat = np.fft.fft2(u)
         lap_u = np.fft.ifft2(-self.K2 * u_hat).real
         return lap_u
-    
+
     def divergence(self, ux: np.ndarray, uy: np.ndarray) -> np.ndarray:
         """Compute divergence of vector field (ux, uy)."""
         ux_hat = np.fft.fft2(ux)
         uy_hat = np.fft.fft2(uy)
         div = np.fft.ifft2(1j * self.KX * ux_hat + 1j * self.KY * uy_hat).real
         return div
-    
+
     def solve_poisson(
         self,
         f: np.ndarray,
@@ -280,30 +283,30 @@ class SpectralSolver2D:
     ) -> np.ndarray:
         """
         Solve Poisson equation: -∇²u = f.
-        
+
         Parameters
         ----------
         f : np.ndarray
             Right-hand side
         regularization : float
             Small value to avoid division by zero at k=0
-            
+
         Returns
         -------
         np.ndarray
             Solution u
         """
         f_hat = np.fft.fft2(f)
-        
+
         # Avoid division by zero at k=0
         K2_reg = self.K2.copy()
         K2_reg[0, 0] = regularization
-        
+
         u_hat = f_hat / K2_reg
         u_hat[0, 0] = 0  # Set mean to zero
-        
+
         return np.fft.ifft2(u_hat).real
-    
+
     def solve_stokes(
         self,
         fx: np.ndarray,
@@ -312,17 +315,17 @@ class SpectralSolver2D:
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Solve 2D Stokes equations using Leray projection.
-        
+
         -μ∇²u + ∇p = f
         ∇·u = 0
-        
+
         Parameters
         ----------
         fx, fy : np.ndarray
             Body force components
         mu : float
             Viscosity
-            
+
         Returns
         -------
         Tuple[np.ndarray, np.ndarray, np.ndarray]
@@ -330,28 +333,32 @@ class SpectralSolver2D:
         """
         fx_hat = np.fft.fft2(fx)
         fy_hat = np.fft.fft2(fy)
-        
+
         # Initialize
         u_hat = np.zeros_like(fx_hat, dtype=complex)
         v_hat = np.zeros_like(fy_hat, dtype=complex)
         p_hat = np.zeros_like(fx_hat, dtype=complex)
-        
+
         # Mask for non-zero wavenumbers
         mask = self.K2 > 1e-14
-        
+
         # k · f
         k_dot_f = self.KX * fx_hat + self.KY * fy_hat
-        
+
         # Leray projection and solve
-        u_hat[mask] = (fx_hat[mask] - self.KX[mask] * k_dot_f[mask] / self.K2[mask]) / (mu * self.K2[mask])
-        v_hat[mask] = (fy_hat[mask] - self.KY[mask] * k_dot_f[mask] / self.K2[mask]) / (mu * self.K2[mask])
-        
+        u_hat[mask] = (fx_hat[mask] - self.KX[mask] * k_dot_f[mask] / self.K2[mask]) / (
+            mu * self.K2[mask]
+        )
+        v_hat[mask] = (fy_hat[mask] - self.KY[mask] * k_dot_f[mask] / self.K2[mask]) / (
+            mu * self.K2[mask]
+        )
+
         # Pressure
         p_hat[mask] = -1j * k_dot_f[mask] / self.K2[mask]
-        
+
         u = np.fft.ifft2(u_hat).real
         v = np.fft.ifft2(v_hat).real
         p = np.fft.ifft2(p_hat).real
         p = p - p.mean()  # Zero mean pressure
-        
+
         return u, v, p

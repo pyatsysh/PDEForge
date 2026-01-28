@@ -14,13 +14,14 @@ Operator Learning Task:
     (u₀, v₀) → (u_T, v_T)
 """
 
+from typing import Callable, Dict, Optional, Tuple, Union
+
 import numpy as np
-from typing import Dict, Tuple, Optional, Union, Callable
 
 from pdeforge.core.base import PDEModel
+from pdeforge.core.params import ParamSpec, ParamType
 from pdeforge.core.registry import register_model
 from pdeforge.core.types import PDEDataset
-from pdeforge.core.params import ParamSpec, ParamType
 from pdeforge.generators.initial_conditions import get_ic_generator
 
 
@@ -28,12 +29,12 @@ from pdeforge.generators.initial_conditions import get_ic_generator
 class FitzHughNagumo2D(PDEModel):
     """
     2D FitzHugh-Nagumo model for excitable media.
-    
+
     ∂u/∂t = D_u ∇²u + u - u³ - v
     ∂v/∂t = D_v ∇²v + ε(u - γv + β)
-    
+
     Can produce spiral waves and complex spatiotemporal patterns.
-    
+
     Examples
     --------
     >>> dataset = generate_dataset(
@@ -43,11 +44,11 @@ class FitzHughNagumo2D(PDEModel):
     ...     params={"epsilon": 0.08, "time_end": 50.0},
     ... )
     """
-    
+
     NDIM = 2
     INPUT_NAMES = ["u0", "v0"]
     OUTPUT_NAMES = ["u_T", "v_T"]
-    
+
     USER_PARAMS = [
         ParamSpec(
             name="epsilon",
@@ -76,7 +77,7 @@ class FitzHughNagumo2D(PDEModel):
             affects="Time for pattern development",
         ),
     ]
-    
+
     DEFAULT_PARAMS = {
         "epsilon": 0.08,
         "diffusivity_u": 1.0,
@@ -87,17 +88,17 @@ class FitzHughNagumo2D(PDEModel):
         "_n_time_steps": 101,
         "_dt": 0.1,
     }
-    
+
     def __init__(
         self,
         resolution: Dict[str, int],
         domain: Dict[str, Tuple[float, float]] = None,
-        **params
+        **params,
     ):
         if domain is None:
             domain = {"x": (0.0, 50.0), "y": (0.0, 50.0)}
         super().__init__(resolution, domain, **params)
-        
+
         self.eps = self.params["epsilon"]
         self.D_u = self.params["diffusivity_u"]
         self.D_v = self.params.get("diffusivity_v", 0.0)
@@ -106,10 +107,10 @@ class FitzHughNagumo2D(PDEModel):
         self.T = self.params.get("time_end", 50.0)
         self.n_t = self.params.get("_n_time_steps", 101)
         self.dt = self.params.get("_dt", 0.1)
-        
+
         self.nx = resolution["x"]
         self.ny = resolution["y"]
-        
+
         # Wavenumbers for spectral Laplacian
         dx = self.grids["x"][1] - self.grids["x"][0]
         dy = self.grids["y"][1] - self.grids["y"][0]
@@ -117,21 +118,18 @@ class FitzHughNagumo2D(PDEModel):
         ky = 2 * np.pi * np.fft.fftfreq(self.ny, d=dy)
         self.KX, self.KY = np.meshgrid(kx, ky)
         self.K2 = self.KX**2 + self.KY**2
-    
+
     def _laplacian(self, u: np.ndarray) -> np.ndarray:
         """Compute 2D Laplacian spectrally."""
         u_hat = np.fft.fft2(u)
         return np.fft.ifft2(-self.K2 * u_hat).real
-    
+
     def solve(
-        self, 
-        ic: np.ndarray, 
-        ic_v: np.ndarray = None,
-        return_full: bool = False
+        self, ic: np.ndarray, ic_v: np.ndarray = None, return_full: bool = False
     ) -> np.ndarray:
         """
         Solve using semi-implicit time stepping.
-        
+
         Parameters
         ----------
         ic : np.ndarray
@@ -147,49 +145,51 @@ class FitzHughNagumo2D(PDEModel):
             v = (u + self.beta) / self.gamma
         else:
             v = ic_v.copy()
-        
+
         t_output = np.linspace(0, self.T, self.n_t)
         dt = self.dt
         n_substeps = int(np.ceil(self.T / dt))
         output_interval = max(1, n_substeps // (self.n_t - 1))
-        
+
         solutions = [(u.copy(), v.copy())]
-        
+
         # Time stepping with operator splitting
         for step in range(n_substeps):
             # 1. Diffusion step (spectral, exact)
             u_hat = np.fft.fft2(u)
             v_hat = np.fft.fft2(v)
-            
+
             exp_u = np.exp(-self.D_u * self.K2 * dt)
             exp_v = np.exp(-self.D_v * self.K2 * dt) if self.D_v > 0 else 1.0
-            
+
             u = np.fft.ifft2(u_hat * exp_u).real
             v = np.fft.ifft2(v_hat * exp_v).real if self.D_v > 0 else v
-            
+
             # 2. Reaction step (forward Euler)
             f_u = u - u**3 - v
             f_v = self.eps * (u - self.gamma * v + self.beta)
-            
+
             u = u + dt * f_u
             v = v + dt * f_v
-            
+
             # Store for output
             if (step + 1) % output_interval == 0 and len(solutions) < self.n_t:
                 solutions.append((u.copy(), v.copy()))
-        
+
         # Ensure we have n_t outputs
         while len(solutions) < self.n_t:
             solutions.append((u.copy(), v.copy()))
-        solutions = solutions[:self.n_t]
-        
+        solutions = solutions[: self.n_t]
+
         if return_full:
             # Shape: (n_t, ny, nx, 2)
-            return np.stack([np.stack([s[0], s[1]], axis=-1) for s in solutions], axis=0)
-        
+            return np.stack(
+                [np.stack([s[0], s[1]], axis=-1) for s in solutions], axis=0
+            )
+
         # Return final state as (ny, nx, 2)
         return np.stack([solutions[-1][0], solutions[-1][1]], axis=-1)
-    
+
     def generate_ic(
         self,
         generator: Union[str, Callable] = "default",
@@ -199,27 +199,27 @@ class FitzHughNagumo2D(PDEModel):
         """Generate initial condition with localized perturbation."""
         if generator_params is None:
             generator_params = {}
-        
+
         if seed is not None:
             np.random.seed(seed)
-        
+
         x = self.grids["x"]
         y = self.grids["y"]
         X, Y = np.meshgrid(x, y)
-        
+
         Lx = x[-1] - x[0]
         Ly = y[-1] - y[0]
-        
+
         # Random localized perturbation
         cx = np.random.uniform(0.2 * Lx, 0.5 * Lx) + x[0]
         cy = np.random.uniform(0.2 * Ly, 0.5 * Ly) + y[0]
         width = np.random.uniform(2.0, 5.0)
         amplitude = np.random.uniform(0.5, 1.5)
-        
-        u0 = amplitude * np.exp(-((X - cx)**2 + (Y - cy)**2) / width**2)
-        
+
+        u0 = amplitude * np.exp(-((X - cx) ** 2 + (Y - cy) ** 2) / width**2)
+
         return u0
-    
+
     def generate_sample(
         self,
         generator: Union[str, Callable] = "default",
@@ -231,22 +231,24 @@ class FitzHughNagumo2D(PDEModel):
         """Generate a single sample."""
         if generator_params is None:
             generator_params = {}
-        
+
         for attempt in range(max_attempts):
             current_seed = seed + attempt if seed is not None else None
-            
+
             ic = self.generate_ic(generator, generator_params, current_seed)
             solution = self.solve(ic)
-            
+
             if validate:
                 validation = self.validate_solution(ic, solution)
-                if validation['valid']:
+                if validation["valid"]:
                     return ic, solution, validation
             else:
-                return ic, solution, {'valid': True}
-        
-        raise RuntimeError(f"Failed to generate valid sample after {max_attempts} attempts")
-    
+                return ic, solution, {"valid": True}
+
+        raise RuntimeError(
+            f"Failed to generate valid sample after {max_attempts} attempts"
+        )
+
     def validate_solution(
         self,
         ic: np.ndarray,
@@ -255,8 +257,8 @@ class FitzHughNagumo2D(PDEModel):
     ) -> Dict:
         """Validate the solution."""
         is_valid = (
-            not np.isnan(solution).any() and
-            not np.isinf(solution).any() and
-            np.abs(solution).max() < 100
+            not np.isnan(solution).any()
+            and not np.isinf(solution).any()
+            and np.abs(solution).max() < 100
         )
-        return {'valid': is_valid, 'max_value': np.abs(solution).max()}
+        return {"valid": is_valid, "max_value": np.abs(solution).max()}

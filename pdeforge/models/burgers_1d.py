@@ -11,9 +11,9 @@ import numpy as np
 from scipy.integrate import odeint
 
 from pdeforge.core.base import PDEModel
-from pdeforge.core.registry import register_model
 from pdeforge.core.params import ParamSpec, ParamType
-from pdeforge.generators.initial_conditions import get_ic_generator, FourierICGenerator
+from pdeforge.core.registry import register_model
+from pdeforge.generators.initial_conditions import FourierICGenerator, get_ic_generator
 
 
 @register_model("burgers_1d")
@@ -68,12 +68,12 @@ class Burgers1D(PDEModel):
         # cf. Anima et al
         u_hat = np.fft.fft(u)
         u_hat_x = 1j * self.k * u_hat
-        u_hat_xx = -self.k**2*u_hat
+        u_hat_xx = -self.k**2 * u_hat
 
         u_x = np.fft.ifft(u_hat_x).real
         u_xx = np.fft.ifft(u_hat_xx).real
 
-        return -self.mu*u*u_x + self.nu*u_xx
+        return -self.mu * u * u_x + self.nu * u_xx
 
     def solve(self, ic, return_full=False):
         """
@@ -118,11 +118,11 @@ class Burgers1D(PDEModel):
     def validate_solution(self, ic, solution, tol=1e-6):
         """Check for NaN/Inf and blowup."""
         is_valid = (
-            not np.isnan(solution).any() and
-            not np.isinf(solution).any() and
-            np.abs(solution).max() < 1e10
+            not np.isnan(solution).any()
+            and not np.isinf(solution).any()
+            and np.abs(solution).max() < 1e10
         )
         return {
-            'valid': is_valid,
-            'max_value': np.abs(solution).max(),
+            "valid": is_valid,
+            "max_value": np.abs(solution).max(),
         }

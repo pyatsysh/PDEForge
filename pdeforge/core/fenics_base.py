@@ -5,22 +5,24 @@ Handles complex geometries, unstructured meshes, non-periodic BCs.
 FEM solutions are interpolated to regular grids for ML compatability.
 """
 
-from abc import abstractmethod
-import numpy as np
 import warnings
+from abc import abstractmethod
+
+import numpy as np
 
 from pdeforge.core.base import PDEModel
-from pdeforge.core.types import PDEDataset, Domain, GridSpec
+from pdeforge.core.types import Domain, GridSpec, PDEDataset
 
 # check if FEniCSx available
 try:
-    import dolfinx
-    from dolfinx import mesh as dfx_mesh
-    from dolfinx import fem, io, geometry
-    from dolfinx.fem.petsc import LinearProblem
-    import ufl
-    from mpi4py import MPI
     import basix
+    import dolfinx
+    import ufl
+    from dolfinx import fem, geometry, io
+    from dolfinx import mesh as dfx_mesh
+    from dolfinx.fem.petsc import LinearProblem
+    from mpi4py import MPI
+
     HAS_FENICSX = True
 except ImportError:
     HAS_FENICSX = False
@@ -29,6 +31,7 @@ except ImportError:
 
 def require_fenicsx(func):
     """Decorator to check FEniCSx is available."""
+
     def wrapper(*args, **kwargs):
         if not HAS_FENICSX:
             raise ImportError(
@@ -36,6 +39,7 @@ def require_fenicsx(func):
                 "Install: conda install -c conda-forge fenics-dolfinx"
             )
         return func(*args, **kwargs)
+
     return wrapper
 
 
@@ -84,15 +88,15 @@ class FEniCSModel(PDEModel):
         dims = sorted(self.output_resolution.keys())
 
         if len(dims) == 2:
-            x = self.grids['x']
-            y = self.grids['y']
-            X, Y = np.meshgrid(x, y, indexing='ij')
+            x = self.grids["x"]
+            y = self.grids["y"]
+            X, Y = np.meshgrid(x, y, indexing="ij")
             # dolfinx 0.10+ requires 3D points even for 2D meshes
             Z = np.zeros_like(X)
             self._output_points = np.column_stack([X.ravel(), Y.ravel(), Z.ravel()])
         elif len(dims) == 3:
-            x, y, z = self.grids['x'], self.grids['y'], self.grids['z']
-            X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
+            x, y, z = self.grids["x"], self.grids["y"], self.grids["z"]
+            X, Y, Z = np.meshgrid(x, y, z, indexing="ij")
             self._output_points = np.column_stack([X.ravel(), Y.ravel(), Z.ravel()])
         else:
             raise ValueError("FEniCSModel only suports 2D and 3D")
@@ -131,8 +135,7 @@ class FEniCSModel(PDEModel):
         shape_suffix = fem_function.ufl_shape
         if shape_suffix:
             output_flat = np.full(
-                (len(self._output_points), *shape_suffix),
-                fill_value, dtype=np.float64
+                (len(self._output_points), *shape_suffix), fill_value, dtype=np.float64
             )
         else:
             output_flat = np.full(
@@ -142,9 +145,9 @@ class FEniCSModel(PDEModel):
         if len(points_on_proc) > 0:
             # pad to 3D if needed (dolfinx 0.10+ requires 3D points)
             if points_on_proc.shape[1] == 2:
-                points_3d = np.column_stack([
-                    points_on_proc, np.zeros(len(points_on_proc))
-                ])
+                points_3d = np.column_stack(
+                    [points_on_proc, np.zeros(len(points_on_proc))]
+                )
             else:
                 points_3d = points_on_proc
 
@@ -188,8 +191,16 @@ class FEniCSModel(PDEModel):
 
         return mask.reshape(shape)
 
-    def generate_dataset(self, n_samples, ic_generator="default", ic_params=None,
-                         seed=None, validate=True, n_jobs=1, verbose=True):
+    def generate_dataset(
+        self,
+        n_samples,
+        ic_generator="default",
+        ic_params=None,
+        seed=None,
+        validate=True,
+        n_jobs=1,
+        verbose=True,
+    ):
         """Generate dataset, adds domain_mask to metadata."""
         dataset = super().generate_dataset(
             n_samples=n_samples,
@@ -201,7 +212,7 @@ class FEniCSModel(PDEModel):
             verbose=verbose,
         )
 
-        dataset.metadata['domain_mask'] = self.create_mask()
-        dataset.metadata['backend'] = 'fenicsx'
+        dataset.metadata["domain_mask"] = self.create_mask()
+        dataset.metadata["backend"] = "fenicsx"
 
         return dataset
