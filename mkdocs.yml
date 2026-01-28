@@ -1,0 +1,78 @@
+site_name: PDEForge
+site_description: A unified framework for generating PDE datasets for operator learning
+site_url: https://pyatsysh.github.io/pdeforge
+repo_url: https://github.com/pyatsysh/pdeforge
+repo_name: pyatsysh/pdeforge
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: deep purple
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: deep purple
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_source: true
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.arithmatex:
+      generic: true
+  - admonition
+  - pymdownx.details
+  - tables
+  - attr_list
+  - md_in_html
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quick Start: getting-started/quickstart.md
+      - FEniCSx Setup: getting-started/fenicsx.md
+  - User Guide:
+      - Unified API: guide/api.md
+      - Available Models: guide/models.md
+      - Parameter Exploration: guide/exploration.md
+      - Data Formats: guide/data-formats.md
+  - Models:
+      - Burgers 1D: models/burgers_1d.md
+      - Darcy 2D: models/darcy_2d.md
+      - Stokes 2D: models/stokes_2d.md
+      - Cylinder Flow 2D: models/cylinder_flow_2d.md
+  - Advanced:
+      - Adding Custom Models: advanced/custom-models.md
+      - Performance: advanced/performance.md
+      - Stochastic Systems: advanced/stochastic.md
+  - API Reference: api/reference.md
