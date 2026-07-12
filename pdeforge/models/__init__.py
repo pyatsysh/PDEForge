@@ -10,6 +10,7 @@ from pdeforge.models import (
     allen_cahn_1d,
     allen_cahn_2d,
     burgers_1d,
+    cahn_hilliard,
     darcy_2d,
     fitzhugh_nagumo_1d,
     fitzhugh_nagumo_2d,
@@ -26,6 +27,7 @@ from pdeforge.models.allen_cahn_2d import AllenCahn2D
 
 # Make model classes available
 from pdeforge.models.burgers_1d import Burgers1D
+from pdeforge.models.cahn_hilliard import CahnHilliard
 from pdeforge.models.darcy_2d import Darcy2D
 from pdeforge.models.fitzhugh_nagumo_1d import FitzHughNagumo1D
 from pdeforge.models.fitzhugh_nagumo_2d import FitzHughNagumo2D
@@ -54,6 +56,8 @@ __all__ = [
     # Allen-Cahn
     "AllenCahn1D",
     "AllenCahn2D",
+    # Cahn-Hilliard (spinodal decomposition, 2D/3D)
+    "CahnHilliard",
     # Stochastic Heat
     "StochasticHeat1D",
     "StochasticHeat2D",

@@ -179,13 +179,14 @@ def describe_all_models(verbose: bool = False) -> str:
         model_cls = get_model(name)
 
         # Basic info
-        ndim = getattr(model_cls, "NDIM", "?")
+        ndim = getattr(model_cls, "NDIM", None)
+        ndim_str = f"{ndim}D" if ndim else "2D/3D"
         backend = getattr(model_cls, "BACKEND", "spectral")
         inputs = getattr(model_cls, "INPUT_NAMES", [])
         outputs = getattr(model_cls, "OUTPUT_NAMES", [])
 
         lines.append(f"[{name}]")
-        lines.append(f"  Dimensions: {ndim}D  |  Backend: {backend}")
+        lines.append(f"  Dimensions: {ndim_str}  |  Backend: {backend}")
         lines.append(f"  Task: {', '.join(inputs)} → {', '.join(outputs)}")
 
         # User parameters

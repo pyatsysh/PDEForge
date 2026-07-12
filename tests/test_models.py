@@ -144,6 +144,97 @@ class TestStokes2D:
         assert info['divergence'] < 1e-8
 
 
+class TestCahnHilliard:
+    """Tests for the N-d Cahn-Hilliard model (spinodal decomposition)."""
+
+    def test_basic_generation_2d(self):
+        """Test basic 2D dataset generation."""
+        dataset = generate_dataset(
+            model="cahn_hilliard",
+            n_samples=4,
+            resolution={"x": 64, "y": 64},
+            seed=42,
+        )
+
+        assert dataset.n_samples == 4
+        assert dataset.inputs.shape == (4, 64, 64)
+        assert dataset.outputs.shape == (4, 64, 64)
+
+    def test_basic_generation_3d(self):
+        """Test that the same model works in 3D from the resolution dict."""
+        dataset = generate_dataset(
+            model="cahn_hilliard",
+            n_samples=2,
+            resolution={"x": 24, "y": 24, "z": 24},
+            params={"time_end": 0.02},
+            seed=42,
+        )
+
+        assert dataset.n_samples == 2
+        assert dataset.inputs.shape == (2, 24, 24, 24)
+        assert dataset.outputs.shape == (2, 24, 24, 24)
+
+    def test_reproducibility(self):
+        """Test that same seed gives same results."""
+        kwargs = dict(
+            model="cahn_hilliard",
+            n_samples=3,
+            resolution={"x": 48, "y": 48},
+            seed=7,
+        )
+        ds1 = generate_dataset(**kwargs)
+        ds2 = generate_dataset(**kwargs)
+
+        np.testing.assert_array_equal(ds1.inputs, ds2.inputs)
+        np.testing.assert_array_equal(ds1.outputs, ds2.outputs)
+
+    def test_mass_conservation(self):
+        """Cahn-Hilliard conserves the spatial mean of u (to machine precision)."""
+        model = get_model("cahn_hilliard")(resolution={"x": 64, "y": 64})
+
+        ic, solution, info = model.generate_sample(seed=42)
+
+        assert info["valid"]
+        assert info["mass_drift"] < 1e-9
+        np.testing.assert_allclose(solution.mean(), ic.mean(), atol=1e-9)
+
+    def test_mean_composition_param(self):
+        """Test that mean_composition sets the conserved mean."""
+        model = get_model("cahn_hilliard")(
+            resolution={"x": 64, "y": 64},
+            mean_composition=0.3,
+        )
+        ic, solution, _ = model.generate_sample(seed=42)
+
+        # IC mean ~ mean_composition, and the solver conserves it.
+        assert abs(ic.mean() - 0.3) < 0.05
+        np.testing.assert_allclose(solution.mean(), ic.mean(), atol=1e-9)
+
+    def test_binarize(self):
+        """binarize=True yields hard {0, 1} masks that validate as masks."""
+        model = get_model("cahn_hilliard")(
+            resolution={"x": 64, "y": 64}, binarize=True
+        )
+        ic, solution, info = model.generate_sample(seed=42)
+
+        # output is a clean two-value mask
+        assert set(np.unique(solution)).issubset({0.0, 1.0})
+        assert info["valid"]
+        assert "fill_fraction" in info
+
+        # full dataset path: shape preserved, m=0 -> roughly balanced fill
+        dataset = generate_dataset(
+            model="cahn_hilliard",
+            n_samples=3,
+            resolution={"x": 64, "y": 64},
+            params={"binarize": True},
+            seed=42,
+        )
+        assert dataset.outputs.shape == (3, 64, 64)
+        assert set(np.unique(dataset.outputs)).issubset({0.0, 1.0})
+        assert 0.3 < dataset.outputs.mean() < 0.7
+
+
 class TestDataset:
     """Tests for PDEDataset functionality."""
     

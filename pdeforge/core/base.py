@@ -27,9 +27,10 @@ class PDEModel(ABC):
     @classmethod
     def describe(cls):
         """Get model description and configurable params."""
+        ndim_str = f"{cls.NDIM}D" if cls.NDIM else "2D / 3D"
         lines = [
             f"Model: {getattr(cls, '_registered_name', cls.__name__)}",
-            f"Dimensions: {cls.NDIM}D",
+            f"Dimensions: {ndim_str}",
             "",
             cls.__doc__ or "No description available.",
             "",

@@ -84,6 +84,7 @@ $PKG_MANAGER create -n "$ENV_NAME" \
     petsc4py \
     mpi4py \
     gmsh \
+    python-gmsh \
     pyvista \
     numpy \
     scipy \

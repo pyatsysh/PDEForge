@@ -63,12 +63,13 @@ PDEForge offers two installation paths because of the trade-off between simplici
 |---|---|---|
 | **Dependencies** | NumPy, SciPy, Matplotlib | + FEniCSx, PETSc, MPI, gmsh |
 | **Install time** | ~1 minute | ~1-5 minutes (with mamba) |
-| **Models available** | 13 spectral models | 17 models (+ complex geometry) |
+| **Models available** | 14 spectral models | 18 models (+ complex geometry) |
 | **Use case** | Most operator learning tasks | Flow around obstacles, complex domains |
 
 **Most PDE problems can be solved with spectral methods.** The basic installation covers:
 - 1D: Burgers, Heat, Wave, Allen-Cahn, FitzHugh-Nagumo, Stochastic Heat
 - 2D: Darcy flow, Stokes flow, Heat, Wave, Allen-Cahn, FitzHugh-Nagumo, Stochastic Heat
+- 2D / 3D: Cahn-Hilliard (spinodal decomposition)
 
 FEniCSx is only needed for **complex geometries** (e.g., flow around obstacles) where spectral methods don't apply. If you're unsure, start with the basic installation—you can always add FEniCSx later.
 
@@ -509,7 +510,7 @@ print(describe_model("burgers_1d"))
 
 ## Model Roadmap
 
-### Available Now: 17 Models
+### Available Now: 18 Models
 
 | Model | Type | Dimensions | Backend |
 |-------|------|------------|---------|
@@ -520,6 +521,7 @@ print(describe_model("burgers_1d"))
 | `wave_2d` | Hyperbolic (oscillatory) | 2D | Spectral |
 | `allen_cahn_1d` | Phase separation (bistable) | 1D | Spectral |
 | `allen_cahn_2d` | Phase separation (bistable) | 2D | Spectral |
+| `cahn_hilliard` | Spinodal decomposition (conserved) | 2D / 3D | Spectral |
 | `fitzhugh_nagumo_1d` | Excitable media (neurons) | 1D | Spectral |
 | `fitzhugh_nagumo_2d` | Excitable media (spirals) | 2D | Spectral |
 | `darcy_2d` | Elliptic (steady) | 2D | Spectral |
