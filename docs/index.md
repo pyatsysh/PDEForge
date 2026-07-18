@@ -13,7 +13,8 @@ hide:
 <p class="pf-tagline">PDEForge turns PDE solvers into training data. One
 command runs any of its 37 models; the finite-element stack ships inside
 the Docker image, and every dataset carries a calibration split reserved
-for uncertainty quantification.</p>
+for uncertainty quantification. Every physical parameter is a per-sample
+input — down to the position of the cylinder in the turbulent wake.</p>
 
 [github.com/pyatsysh/PDEForge](https://github.com/pyatsysh/PDEForge){ .md-button .md-button--primary }
 [Quickstart](getting-started/quickstart.md){ .md-button }
