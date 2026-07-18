@@ -137,3 +137,142 @@
 [data-md-color-scheme="default"] .md-typeset img {
   box-shadow: 0 2px 10px rgba(46, 52, 64, 0.28);
 }
+
+/* ---------- landing hero (lab v1: kellax-anatomy candidate) ---------- */
+
+.pf-hero {
+  display: flex;
+  align-items: center;
+  gap: 2.5rem;
+  margin: 0.5rem 0 1.5rem;
+  flex-wrap: wrap;
+}
+.pf-hero-text {
+  flex: 1 1 24rem;
+  min-width: 18rem;
+}
+.pf-hero-fig {
+  flex: 1 1 20rem;
+  min-width: 16rem;
+  margin: 0;
+}
+.pf-hero-fig img {
+  border-radius: 2px;
+  box-shadow: 0 1px 4px rgba(46, 52, 64, 0.18);
+}
+.pf-hero-fig figcaption {
+  font-family: "Crimson Text", serif;
+  font-style: italic;
+  font-size: 0.78rem;
+  color: var(--md-default-fg-color--light);
+  margin-top: 0.5rem;
+}
+.pf-eyebrow {
+  font-family: "Headland One", serif;
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
+  color: var(--md-default-fg-color--light);
+  margin-bottom: 0.2rem;
+}
+.pf-hero-text h1 {
+  font-size: 3.2rem;
+  margin: 0.1em 0 0.15em;
+}
+.pf-accent {
+  color: #bf616a;
+}
+.pf-tagline {
+  font-family: "Crimson Text", serif;
+  font-style: italic;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  color: var(--md-typeset-color);
+}
+
+/* ---------- gallery: motion grid (lab v1) ---------- */
+
+.pf-motion-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.2rem;
+  margin: 1rem 0 2rem;
+}
+.pf-motion-item {
+  margin: 0;
+}
+.pf-motion-item video {
+  width: 100%;
+  display: block;
+  border-radius: 2px;
+  box-shadow: 0 1px 4px rgba(46, 52, 64, 0.18);
+}
+.pf-motion-item figcaption {
+  font-family: "Crimson Text", serif;
+  font-style: italic;
+  font-size: 0.78rem;
+  color: var(--md-default-fg-color--light);
+  margin-top: 0.4rem;
+}
+
+.pf-motion-item.pf-wide {
+  grid-column: 1 / -1;
+}
+.pf-motion-item.pf-wide video {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+/* ---------- gallery: banner tiles + uniform stills grid (lab v2) ---------- */
+
+.pf-banner-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.4rem;
+  margin: 1rem 0 1.5rem;
+}
+.pf-banner-grid figure,
+.pf-stills-grid figure {
+  margin: 0;
+}
+.pf-banner-grid p,
+.pf-stills-grid p {
+  margin: 0;
+}
+.pf-banner-grid img {
+  width: 100%;
+  display: block;
+  border-radius: 2px;
+}
+.pf-banner-grid figcaption {
+  font-family: "Crimson Text", serif;
+  font-style: italic;
+  font-size: 0.68rem;
+  line-height: 1.25;
+  text-align: center;
+  color: var(--md-default-fg-color--light);
+  margin-top: 0.25rem;
+}
+
+.pf-stills-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.2rem;
+  margin: 1rem 0 2rem;
+}
+.pf-stills-grid img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: contain;
+  /* letterbox in the figures' own surface color, so odd aspects sit
+     centered in a uniform box instead of breaking the grid */
+  background: #2e3440;
+  border-radius: 2px;
+  display: block;
+}
+.pf-stills-grid figcaption {
+  font-family: "Crimson Text", serif;
+  font-style: italic;
+  font-size: 0.78rem;
+  color: var(--md-default-fg-color--light);
+  margin-top: 0.4rem;
+}

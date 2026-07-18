@@ -1,7 +1,29 @@
-# PDEForge
+---
+hide:
+  - navigation
+  - toc
+---
 
-**PDE training data from one command — 37 models, calibration-ready splits,
-FEM without installing FEniCS.**
+<div class="pf-hero" markdown>
+<div class="pf-hero-text" markdown>
+<p class="pf-eyebrow">A PYTHON PACKAGE · DOCKER-FIRST · MIT</p>
+
+# PDE<span class="pf-accent">Forge</span>
+
+<p class="pf-tagline">PDEForge turns PDE solvers into training data. One
+command runs any of its 37 models; the finite-element stack ships inside
+the Docker image, and every dataset carries a calibration split reserved
+for uncertainty quantification.</p>
+
+[github.com/pyatsysh/PDEForge](https://github.com/pyatsysh/PDEForge){ .md-button .md-button--primary }
+[Quickstart](getting-started/quickstart.md){ .md-button }
+</div>
+<figure class="pf-hero-fig" markdown>
+![Flow past a NACA 4412 airfoil at 6 degrees](figures/naca_flow.png)
+<figcaption>Flow past a NACA 4412 airfoil, AoA 6° — one command:
+geometry, mesh, solve, splits.</figcaption>
+</figure>
+</div>
 
 ```bash
 docker run -v $PWD/data:/data ghcr.io/pyatsysh/pdeforge:fenicsx \
@@ -13,8 +35,6 @@ Pull the image on any machine with Docker and watch an airfoil dataset
 appear from one line: per-sample NACA geometry, meshed and solved, with
 velocity/pressure fields, an SDF geometry channel, lift and drag
 coefficients, and full provenance metadata.
-
-![Flow past a NACA 4412 airfoil at 6 degrees](figures/naca_flow.png)
 
 ## What PDEForge is
 
@@ -57,22 +77,13 @@ splits = data.split(train=0.6, val=0.15, cal=0.15, test=0.1)
 
 ## Gallery
 
-Every image below is package output — regenerate them all with
+Every image is package output — regenerate them all with
 `python scripts/make_gallery.py`.
 
 ![Six PDE textures](figures/banner.png)
 
-| | |
-|---|---|
-| ![Kolmogorov flow vorticity](figures/kolmogorov_vorticity.png) | ![Gray-Scott patterns](figures/gray_scott.png) |
-| Forced 2D turbulence (`kolmogorov_flow_2d`, JAX backend) | Gray-Scott mitosis regime (`gray_scott_2d`) |
-| ![Kuramoto-Sivashinsky spacetime](figures/ks_spacetime.png) | ![Waves in a random medium](figures/wave_random_medium.png) |
-| Spatiotemporal chaos, x vs t (`ks_1d`) | Wavefronts refracting through a random medium (`heterogeneous_wave_2d`) |
-| ![Darcy 3D](figures/darcy3d_hero.png) | ![3D spinodal decomposition](figures/spinodal3d.png) |
-| Canonical Darcy pressure in 3D (`darcy_fno_3d`) | The u = 0 interface of 3D spinodal decomposition (`cahn_hilliard`) |
-
-![Vortex shedding behind a cylinder](figures/cylinder_flow_animation.gif)
-*von Karman vortex street (`cylinder_flow_2d_unsteady`)*
+The full set — including the motion loops — lives in the
+[**Gallery**](gallery.md).
 
 ## Install
 
