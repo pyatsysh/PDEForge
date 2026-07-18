@@ -6,8 +6,13 @@ repo_name: pyatsysh/pdeforge
 
 theme:
   name: material
+  font:
+    # the site's font2 set: Crimson Text body, Roboto Mono code
+    # (Fredericka the Great / Headland One display faces load in nord.css)
+    text: Crimson Text
+    code: Roboto Mono
   palette:
-    # Nord (mapped from the author's site theme): snow storm / polar night
+    # theme2 by day (frost menu bar on snow storm), polar night by dark
     - media: "(prefers-color-scheme: light)"
       scheme: default
       primary: custom
