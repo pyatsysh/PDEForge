@@ -14,4 +14,4 @@ COPY . .
 RUN pip install --no-cache-dir -e ".[hdf5,zarr]" \
     && python -c "import pdeforge; print(f'PDEForge {pdeforge.__version__}: ' + ', '.join(pdeforge.list_models()))"
 
-CMD ["python"]
+CMD ["pdeforge", "--help"]

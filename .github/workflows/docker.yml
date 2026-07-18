@@ -22,7 +22,37 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push
+      - name: Build and push (slim appliance)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/pdeforge:latest
+            ghcr.io/${{ github.repository_owner }}/pdeforge:slim-${{ github.sha }}
+
+      - name: Build and push (cuda appliance)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.cuda
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/pdeforge:cuda
+            ghcr.io/${{ github.repository_owner }}/pdeforge:cuda-${{ github.sha }}
+
+      - name: Build and push (fenicsx-cuda appliance)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.fenicsx-cuda
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/pdeforge:fenicsx-cuda
+            ghcr.io/${{ github.repository_owner }}/pdeforge:fenicsx-cuda-${{ github.sha }}
+
+      - name: Build and push (fenicsx appliance)
         uses: docker/build-push-action@v6
         with:
           context: .

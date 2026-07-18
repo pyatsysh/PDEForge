@@ -76,6 +76,9 @@ all = [
     "pdeforge[dev,notebook,hdf5,zarr,jax,torch,viz3d]",
 ]
 
+[project.scripts]
+pdeforge = "pdeforge.cli:main"
+
 [project.urls]
 Homepage = "https://github.com/pyatsysh/pdeforge"
 Documentation = "https://pyatsysh.github.io/pdeforge"

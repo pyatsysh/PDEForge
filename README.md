@@ -8,6 +8,29 @@
 
 PDEForge provides a simple, unified interface to generate training data for functional learning tasks from various PDE models. It is designed with **uncertainty quantification (UQ)** as a first-class concern.
 
+## FEM Training Data Without Installing FEniCS
+
+PDEForge ships **finite-element training-data generators** — steady and
+vortex-shedding cylinder flows, Smagorinsky LES turbulence, and a
+**parameterised NACA airfoil family** with per-sample lift and drag — and you
+**never install FEniCSx**. The FEM stack (PETSc, MPI, gmsh, dolfinx) is
+famously painful to build; here it lives inside a container, solved once in
+CI, and you drive it from one command:
+
+```bash
+docker run -v $PWD/data:/data ghcr.io/pyatsysh/pdeforge:fenicsx \
+    pdeforge generate --model naca_flow_2d --n 200 \
+    --resolution x=96 y=48 --seed 0 --out /data/naca
+```
+
+Every sample draws its own airfoil (thickness, camber, angle of attack), the
+channel is re-meshed, the flow is solved, and the dataset — SDF geometry
+channel, velocity/pressure fields, lift/drag coefficients, full provenance
+metadata — lands in `./data/naca`. No compiler, no conda, no PETSc build.
+The same command works for every one of the 37 models, and
+`pdeforge reproduce metadata.json` regenerates any dataset bit-for-bit:
+the container pins the environment, the metadata pins the run.
+
 ## Why PDEForge?
 
 | Challenge | PDEForge Solution |
@@ -17,6 +40,7 @@ PDEForge provides a simple, unified interface to generate training data for func
 | No way to explore before downloading | Interactive visualization |
 | No stochastic/UQ-ready datasets | Built-in support for stochastic PDEs |
 | Unclear train/val/test splits | Dedicated calibration split for UQ |
+| FEM data means installing FEniCS | One docker command — never install it |
 
 PDEForge is built to serve uncertainty quantification workflows for neural operators: every dataset can carry a dedicated calibration split for conformal prediction (see [UQ Workflow](#uq-workflow) below).
 
@@ -54,6 +78,41 @@ We provide setup scripts to create conda environments with all dependencies:
 ```
 
 These scripts create conda environments, install dependencies, register Jupyter kernels, and run tests.
+
+### Zero-Install: the Docker Appliance
+
+Skip installation entirely — the container ships everything (including the
+FEniCSx stack in the `:fenicsx` tag) and datasets land in a mounted folder:
+
+```bash
+# spectral models (32 of 37) — slim image
+docker run -v $PWD/data:/data ghcr.io/pyatsysh/pdeforge \
+    pdeforge generate --preset fno_darcy_2d --n 1024 \
+    --resolution x=421 y=421 --seed 0 --out /data/darcy421
+
+# FEM models too (cylinder flows, NACA airfoils) — full image
+docker run -v $PWD/data:/data ghcr.io/pyatsysh/pdeforge:fenicsx \
+    pdeforge generate --model naca_flow_2d --n 100 \
+    --resolution x=96 y=48 --seed 0 --out /data/naca
+```
+
+GPU images add JAX CUDA wheels — the spectral models accelerate on any
+NVIDIA GPU (host needs the driver + nvidia-container-toolkit; FEM models
+run on CPU in all images):
+
+```bash
+docker run --gpus all -v $PWD/data:/data ghcr.io/pyatsysh/pdeforge:cuda \
+    pdeforge generate --model ns_vorticity_2d --backend jax --n 5000 \
+    --resolution x=128 y=128 --seed 0 --out /data/ns
+
+# both stacks in one box: JAX on the GPU, FEniCSx on the CPU
+docker run --gpus all -v $PWD/data:/data ghcr.io/pyatsysh/pdeforge:fenicsx-cuda ...
+```
+
+The same CLI works in any local install: `pdeforge generate|reproduce|models|presets|describe`.
+`pdeforge reproduce metadata.json --out ./again` regenerates any seeded
+dataset from its own metadata — the container pins the environment, the
+metadata pins the run.
 
 ### Why Two Installation Options?
 

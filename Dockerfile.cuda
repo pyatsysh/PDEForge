@@ -1,0 +1,16 @@
+# PDEForge appliance with JAX CUDA wheels: spectral models on the GPU.
+# Host needs the NVIDIA driver + nvidia-container-toolkit; run with --gpus all.
+#
+#   docker run --gpus all -v $PWD/data:/data pdeforge:cuda \
+#       pdeforge generate --model ns_vorticity_2d --backend jax \
+#       --n 5000 --resolution x=128 y=128 --seed 0 --out /data/ns
+
+FROM python:3.12-slim
+
+WORKDIR /opt/pdeforge
+COPY . .
+
+RUN pip install --no-cache-dir ".[hdf5,zarr]" "jax[cuda12]" \
+    && pdeforge models | head -3
+
+CMD ["pdeforge", "--help"]

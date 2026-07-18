@@ -1,0 +1,14 @@
+# The full appliance: FEniCSx (CPU) + JAX with CUDA wheels (GPU) in one box.
+# FEM models (cylinder flows, NACA) run on CPU — the stock dolfinx/PETSc
+# build is CPU-only; spectral models accelerate on the GPU via backend=jax.
+# Run with --gpus all (host: NVIDIA driver + nvidia-container-toolkit).
+
+FROM dolfinx/dolfinx:stable
+
+WORKDIR /opt/pdeforge
+COPY . .
+
+RUN pip install --no-cache-dir -e ".[hdf5,zarr]" "jax[cuda12]" \
+    && pdeforge models | head -3
+
+CMD ["pdeforge", "--help"]
