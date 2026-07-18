@@ -276,3 +276,12 @@
   color: var(--md-default-fg-color--light);
   margin-top: 0.4rem;
 }
+
+/* caption emphasis: the one representative knob per demo, lifted to full
+   ink (Crimson 600 italic) against the muted caption line */
+.pf-motion-item figcaption strong,
+.pf-stills-grid figcaption strong,
+.pf-hero-fig figcaption strong {
+  color: var(--md-default-fg-color);
+  font-weight: 600;
+}
