@@ -18,7 +18,7 @@ PDEForge provides a simple, unified interface to generate training data for func
 | No stochastic/UQ-ready datasets | Built-in support for stochastic PDEs |
 | Unclear train/val/test splits | Dedicated calibration split for UQ |
 
-PDEForge is the data generation backbone for [Operator_UQ](https://github.com/your-org/Operator_UQ), our framework for uncertainty quantification in neural operators.
+PDEForge is built to serve uncertainty quantification workflows for neural operators: every dataset can carry a dedicated calibration split for conformal prediction (see [UQ Workflow](#uq-workflow) below).
 
 ## Installation
 
@@ -36,7 +36,7 @@ pip install pdeforge[hdf5]
 pip install pdeforge[all]
 
 # Development installation
-git clone https://github.com/your-org/pdeforge.git
+git clone https://github.com/pyatsysh/PDEForge.git
 cd pdeforge
 pip install -e ".[dev]"
 ```
@@ -107,6 +107,9 @@ splits = dataset.split(train=0.6, val=0.15, cal=0.15, test=0.1)
 
 # Interactive visualization (in Jupyter)
 dataset.visualize()
+
+# 3D fields: PyVista volume/isosurface/slices (pip install pdeforge[viz3d])
+# dataset.visualize_3d(mode="isosurface").show()
 
 # Save for later
 dataset.save("./my_dataset")
@@ -508,30 +511,52 @@ from pdeforge import describe_model
 print(describe_model("burgers_1d"))
 ```
 
-## Model Roadmap
+## Model Catalogue
 
-### Available Now: 18 Models
+### Available Now: 37 Models
 
 | Model | Type | Dimensions | Backend |
 |-------|------|------------|---------|
-| `burgers_1d` | Advection-diffusion | 1D | Spectral |
-| `heat_1d` | Diffusion | 1D | Spectral |
-| `heat_2d` | Diffusion | 2D | Spectral |
+| `advection_1d` | Linear transport (exactly solvable) | 1D | Spectral |
+| `burgers_1d` | Advection-diffusion | 1D | Spectral (+JAX) |
+| `burgers_2d` | Vector self-advection | 2D | Spectral (+JAX) |
+| `heat_1d` | Diffusion | 1D | Spectral (+JAX) |
+| `heat_2d` | Diffusion | 2D | Spectral (+JAX) |
+| `heat_3d` | Diffusion | 3D | Spectral (+JAX) |
 | `wave_1d` | Hyperbolic (oscillatory) | 1D | Spectral |
 | `wave_2d` | Hyperbolic (oscillatory) | 2D | Spectral |
-| `allen_cahn_1d` | Phase separation (bistable) | 1D | Spectral |
+| `heterogeneous_wave_2d` | Wave in random media (c(x) → field) | 2D | Spectral |
+| `ks_1d` | Kuramoto-Sivashinsky (chaotic) | 1D | Spectral (+JAX) |
+| `kdv_1d` | Dispersive solitons | 1D | Spectral (+JAX) |
+| `ns_vorticity_2d` | Incompressible Navier-Stokes | 2D | Spectral (+JAX) |
+| `kolmogorov_flow_2d` | Forced 2D turbulence | 2D | Spectral (+JAX) |
+| `shallow_water_2d` | Gravity waves (h, hu, hv) | 2D | Spectral (+JAX) |
+| `schrodinger_1d` | Nonlinear Schrodinger (split-step) | 1D | Spectral |
+| `allen_cahn_1d` | Phase separation (bistable) | 1D | Spectral (+JAX) |
 | `allen_cahn_2d` | Phase separation (bistable) | 2D | Spectral |
+| `allen_cahn_3d` | Phase separation (bistable) | 3D | Spectral (+JAX) |
 | `cahn_hilliard` | Spinodal decomposition (conserved) | 2D / 3D | Spectral |
+| `gray_scott_2d` | Pattern formation (Pearson regimes) | 2D | Spectral (+JAX) |
+| `lotka_volterra_2d` | Diffusive predator-prey | 2D | Spectral (+JAX) |
 | `fitzhugh_nagumo_1d` | Excitable media (neurons) | 1D | Spectral |
 | `fitzhugh_nagumo_2d` | Excitable media (spirals) | 2D | Spectral |
 | `darcy_2d` | Elliptic (steady) | 2D | Spectral |
 | `stokes_2d` | Incompressible flow | 2D | Spectral |
+| `helmholtz_2d` | Frequency-domain elliptic (steady) | 2D | Spectral |
 | `stochastic_heat_1d` | Diffusion + noise | 1D | Spectral |
 | `stochastic_heat_2d` | Diffusion + noise | 2D | Spectral |
+| `stochastic_burgers_1d` | Burgers + noise | 1D | Spectral |
+| `stochastic_allen_cahn_2d` | Phase separation + fluctuations | 2D | Spectral |
 | `cylinder_flow_2d` | Flow with obstacle (steady) | 2D | FEniCSx |
 | `cylinder_flow_2d_unsteady` | Vortex shedding (time-dep) | 2D+t | FEniCSx |
 | `cylinder_flow_2d_parameterized` | Variable obstacle position | 2D | FEniCSx |
 | `cylinder_flow_2d_turbulent` | High-Re LES turbulence | 2D+t | FEniCSx |
+| `darcy_fno_2d` | Canonical FNO Darcy (validated, knobbed) | 2D | FD direct |
+| `darcy_fno_3d` | Canonical Darcy measure in 3D (CG solver) | 3D | FD/CG |
+| `naca_flow_2d` | NACA airfoil family (SDF → flow + Cl/Cd) | 2D | FEniCSx |
+
+"(+JAX)" marks models on the solver seam that also run on the optional
+GPU-capable JAX backend: `generate_dataset(..., backend="jax")`.
 
 Use `describe_all_models()` for a quick overview:
 
@@ -557,14 +582,39 @@ Use for:
 - **Generative models**: Learn conditional distributions P(u_T | u_0)
 - **Uncertainty quantification**: Estimate output variance from realizations
 
-### Planned: Additional Models
+### UQ-Native Data Tools
 
-| Model | Description | Status |
-|-------|-------------|--------|
-| `lotka_volterra_2d` | Predator-prey with diffusion | Planned |
-| `gray_scott_2d` | Pattern formation | Planned |
-| `stochastic_burgers_1d` | Burgers + noise | Planned |
-| `stochastic_allen_cahn_2d` | Phase separation + fluctuations | Planned |
+Beyond the four-way calibration split, `pdeforge.uq` provides the layer that
+uncertainty studies actually need:
+
+```python
+from pdeforge.uq import (LogUniform, generate_parametric_dataset,
+                         split_ood, generate_multifidelity, observe,
+                         conformal_quantile, empirical_coverage)
+
+# parameters as DISTRIBUTIONS, Sobol/LHS designs, per-sample values recorded
+data = generate_parametric_dataset(
+    "burgers_1d", n_samples=1000, resolution={"x": 256},
+    param_dists={"viscosity": LogUniform(1e-4, 1e-1)}, sampler="sobol", seed=0)
+
+# distribution-shift splits: calibrate in-range, probe out-of-range
+splits = split_ood(data, by="viscosity",
+                   train_range=(1e-4, 1e-2), ood_range=(1e-2, 1e-1))
+
+# multi-fidelity pairs: the SAME realisations at several resolutions
+pair = generate_multifidelity("heat_1d", resolutions=[{"x": 64}, {"x": 256}],
+                              n_samples=500, seed=0)
+
+# observation operators: sensors / subsampling / noise, fully recorded
+sparse = observe(data, sensors=64, noise_std=0.01, seed=0)
+```
+
+And `pdeforge.verify` puts error bars on the ground truth itself:
+
+```python
+from pdeforge.verify import verify_model
+report = verify_model("burgers_1d")   # convergence orders + error estimates
+```
 
 ## Comparison with "the-well"
 
@@ -580,24 +630,40 @@ Use for:
 
 ## Performance
 
-PDEForge uses **NumPy/SciPy** for maximum compatibility. This is fast enough for most research:
+PDEForge defaults to **NumPy/SciPy** for maximum compatibility, with three
+acceleration paths that compose with every model that supports them:
 
-| Use Case | Samples | Time | Our Advice |
-|----------|---------|------|------------|
-| Exploration | 100 | seconds | Just run it |
-| Development | 1,000 | minutes | Fine for iteration |
-| Training | 10,000+ | hours | Generate once, save, reuse |
+```python
+# 1. process-parallel generation
+dataset = generate_dataset("burgers_1d", n_samples=10000, n_jobs=8, ...)
+
+# 2. the optional JAX backend: jit + vmap over samples (CPU or GPU)
+dataset = generate_dataset("burgers_1d", n_samples=10000, backend="jax", ...)
+
+# 3. chunked-to-disk generation: no RAM ceiling, lazy memmapped loading
+dataset = generate_dataset("burgers_1d", n_samples=100000,
+                           to="./big_run", chunk_size=512, ...)
+```
+
+Measured on `burgers_1d`, 256 points, 64 samples (Linux, CPU only):
+
+| Path | Throughput | Speedup |
+|------|-----------|---------|
+| NumPy sequential | 8.2 samples/s | 1x |
+| NumPy `n_jobs=4` | 26.6 samples/s | 3.3x |
+| JAX batched (warm, CPU) | 128.6 samples/s | **15.7x** |
+
+On a CUDA GPU the JAX path accelerates further (install a CUDA jaxlib).
+Datasets remain plain NumPy on the way out regardless of backend, and the
+IC streams are backend-invariant: the same seed gives bit-identical inputs
+on numpy and jax, with outputs equal to solver tolerance.
 
 ```python
 # Generate once, reuse forever
-dataset = generate_dataset("burgers_1d", n_samples=10000, ...)
-dataset.save("./my_training_data")
-
-# Load instantly
+dataset.save("./my_training_data")          # dir / .npz / .h5 / .zarr
 dataset = load_dataset("./my_training_data")
+dataset.to_torch()                          # torch Dataset (optional dep)
 ```
-
-**Future**: We plan to add an optional JAX backend for GPU acceleration. See `docs/performance.md` for details.
 
 ## Requirements
 
@@ -699,11 +765,13 @@ FEniCSx uses MPI for parallelization, which can cause issues when running notebo
 
 This is a known limitation of FEniCSx in Jupyter environments, not a PDEForge issue. The spectral models (basic installation) work without any issues in all execution modes.
 
-## Integration with Operator_UQ
+## UQ Workflow
 
-PDEForge is designed as the data generation layer for [Operator_UQ](https://github.com/your-org/Operator_UQ), our framework for uncertainty quantification in neural operators.
+PDEForge is designed as the data layer for uncertainty quantification in neural
+operators. The dedicated calibration split makes split-conformal prediction a
+first-class citizen — no hand-slicing calibration data out of your training set.
 
-**Typical workflow:**
+**Typical workflow (with any surrogate + any conformal library):**
 
 ```python
 # 1. Generate data with PDEForge
@@ -713,18 +781,12 @@ dataset = generate_dataset("burgers_1d", n_samples=10000, resolution={"x": 256})
 splits = dataset.split(train=0.6, val=0.15, cal=0.15, test=0.1)
 dataset.save("./burgers_data")
 
-# 2. Train and calibrate with Operator_UQ
-from operator_uq import FNO, ConformalPredictor
+# 2. Train any surrogate on splits["train"], tune on splits["val"]
 
-model = FNO(modes=16, width=64)
-model.fit(splits['train'])
-
-# Calibrate prediction intervals
-predictor = ConformalPredictor(model)
-predictor.calibrate(splits['cal'])  # Uses the dedicated calibration split!
-
-# 3. Make predictions with uncertainty
-y_pred, intervals = predictor.predict(splits['test'], confidence=0.9)
+# 3. Split-conformal calibration on the DEDICATED calibration split:
+#    compute nonconformity scores on splits["cal"], take the (1 - alpha)
+#    quantile, and attach it as an interval half-width to test predictions.
+#    See docs/guide/calibration.md and examples/ for end-to-end recipes.
 ```
 
 ## Contributing
@@ -751,6 +813,6 @@ If you use PDEForge in your research, please cite:
   author = {Yatsyshin, Peter},
   title = {PDEForge: A Unified Framework for PDE Dataset Generation},
   year = {2026},
-  url = {https://github.com/your-org/pdeforge}
+  url = {https://github.com/pyatsysh/PDEForge}
 }
 ```

@@ -1,0 +1,17 @@
+# PDEForge with the full FEniCSx stack preinstalled.
+#
+#   docker build -f Dockerfile.fenicsx -t pdeforge:fenicsx .
+#   docker run -it pdeforge:fenicsx python -c "import pdeforge; print(pdeforge.list_models())"
+#
+# Built on the official dolfinx image, which carries PETSc/MPI/gmsh — the
+# part of the install that is painful everywhere else.
+
+FROM dolfinx/dolfinx:stable
+
+WORKDIR /opt/pdeforge
+COPY . .
+
+RUN pip install --no-cache-dir -e ".[hdf5,zarr]" \
+    && python -c "import pdeforge; print(f'PDEForge {pdeforge.__version__}: ' + ', '.join(pdeforge.list_models()))"
+
+CMD ["python"]

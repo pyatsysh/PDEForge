@@ -147,9 +147,10 @@ class PDEDataset:
     output_names: List[str] = field(default_factory=lambda: ["output"])
 
     def __post_init__(self):
-        # Ensure arrays are numpy arrays
-        self.inputs = np.asarray(self.inputs)
-        self.outputs = np.asarray(self.outputs)
+        # Ensure arrays are numpy arrays (asanyarray preserves memmaps for
+        # lazily-loaded datasets).
+        self.inputs = np.asanyarray(self.inputs)
+        self.outputs = np.asanyarray(self.outputs)
 
     @property
     def n_samples(self) -> int:
@@ -209,7 +210,17 @@ class PDEDataset:
                     inputs=self.inputs[idx],
                     outputs=self.outputs[idx],
                     grid=self.grid.copy(),
-                    metadata={**self.metadata, "split": name},
+                    metadata={
+                        **self.metadata,
+                        "split": name,
+                        "split_seed": seed,
+                        "split_fractions": {
+                            "train": train,
+                            "val": val,
+                            "cal": cal,
+                            "test": test,
+                        },
+                    },
                     input_names=self.input_names,
                     output_names=self.output_names,
                 )
@@ -249,7 +260,7 @@ class PDEDataset:
         print(f"Dataset saved to {path}")
 
     @classmethod
-    def load(cls, path: Union[str, Path]) -> "PDEDataset":
+    def load(cls, path: Union[str, Path], mmap: bool = False) -> "PDEDataset":
         """
         Load a dataset from disk.
 
@@ -257,6 +268,8 @@ class PDEDataset:
         ----------
         path : str or Path
             Path to saved dataset directory
+        mmap : bool
+            Memory-map the arrays (lazy reads; larger-than-RAM datasets).
 
         Returns
         -------
@@ -266,8 +279,9 @@ class PDEDataset:
         path = Path(path)
 
         # Load arrays
-        inputs = np.load(path / "inputs.npy")
-        outputs = np.load(path / "outputs.npy")
+        mode = "r" if mmap else None
+        inputs = np.load(path / "inputs.npy", mmap_mode=mode)
+        outputs = np.load(path / "outputs.npy", mmap_mode=mode)
 
         # Load metadata
         with open(path / "metadata.json", "r") as f:
@@ -288,6 +302,59 @@ class PDEDataset:
             input_names=input_names,
             output_names=output_names,
         )
+
+    def to_torch(self, dtype=None):
+        """
+        Wrap this dataset as a torch.utils.data.Dataset of (input, output)
+        tensor pairs. Lazy import — torch is an optional dependency
+        (pip install pdeforge[torch]).
+        """
+        try:
+            import torch
+            from torch.utils.data import Dataset as TorchDataset
+        except ImportError as e:
+            raise ImportError("PyTorch is required: pip install pdeforge[torch]") from e
+
+        inputs, outputs, want = self.inputs, self.outputs, dtype or torch.float32
+
+        class _PDEForgeTorchDataset(TorchDataset):
+            def __len__(self):
+                return inputs.shape[0]
+
+            def __getitem__(self, i):
+                # per-item conversion keeps memmapped arrays lazy
+                return (
+                    torch.as_tensor(np.asarray(inputs[i]), dtype=want),
+                    torch.as_tensor(np.asarray(outputs[i]), dtype=want),
+                )
+
+        return _PDEForgeTorchDataset()
+
+    def torch_loader(self, batch_size=32, shuffle=True, **kwargs):
+        """Convenience: a torch DataLoader over to_torch()."""
+        from torch.utils.data import DataLoader
+
+        return DataLoader(
+            self.to_torch(), batch_size=batch_size, shuffle=shuffle, **kwargs
+        )
+
+    def to_jax(self):
+        """Return (inputs, outputs) as jax device arrays (optional dep)."""
+        try:
+            import jax.numpy as jnp
+        except ImportError as e:
+            raise ImportError("JAX is required: pip install pdeforge[jax]") from e
+        return jnp.asarray(self.inputs), jnp.asarray(self.outputs)
+
+    def visualize_3d(self, sample=0, which="output", mode="isosurface", **kwargs):
+        """
+        Render a 3D field with PyVista (optional dep: pdeforge[viz3d]).
+        Returns the Plotter; call .show() to display. For a dependency-free
+        view use pdeforge.visualization.plot_3d_slices (matplotlib).
+        """
+        from pdeforge.visualization.volume import visualize_3d
+
+        return visualize_3d(self, sample=sample, which=which, mode=mode, **kwargs)
 
     def visualize(self):
         """

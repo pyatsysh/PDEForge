@@ -17,17 +17,16 @@ Operator Learning Task:
 from typing import Callable, Dict, Optional, Tuple, Union
 
 import numpy as np
-from scipy.integrate import odeint
 
-from pdeforge.core.base import PDEModel
 from pdeforge.core.params import ParamSpec, ParamType
 from pdeforge.core.registry import register_model
 from pdeforge.core.types import PDEDataset
 from pdeforge.generators.initial_conditions import get_ic_generator
+from pdeforge.solvers.semilinear import SemiLinearSpectralModel
 
 
 @register_model("allen_cahn_1d")
-class AllenCahn1D(PDEModel):
+class AllenCahn1D(SemiLinearSpectralModel):
     """
     1D Allen-Cahn equation for phase separation.
 
@@ -88,25 +87,20 @@ class AllenCahn1D(PDEModel):
         self.T = self.params.get("time_end", 10.0)
         self.n_t = self.params.get("_n_time_steps", 201)
 
+        self._setup_spectral()
         self.nx = resolution["x"]
         self.dx = self.grids["x"][1] - self.grids["x"][0]
-        self.k = 2 * np.pi * np.fft.fftfreq(self.nx, d=self.dx)
+        self.k = self.K[0]
 
-    def _rhs(self, u: np.ndarray, t: float) -> np.ndarray:
-        """Compute RHS: ε∂²u/∂x² + u - u³"""
-        u_hat = np.fft.fft(u)
-        u_xx = np.fft.ifft(-self.k**2 * u_hat).real
+        # ETDRK4 on the seam: the stiff -eps*k^2 term AND the linear +u
+        # reaction sit in L (integrated exactly); only -u^3 is stepped.
+        self.dt = self.params.get("_dt") or min(0.05, self.T / 200.0)
 
-        return self.eps * u_xx + u - u**3
+    def linear_symbol(self):
+        return -self.eps * self.k**2 + 1.0
 
-    def solve(self, ic: np.ndarray, return_full: bool = False) -> np.ndarray:
-        """Solve the Allen-Cahn equation."""
-        t = np.linspace(0, self.T, self.n_t)
-        U = odeint(self._rhs, ic, t, mxstep=10000)
-
-        if return_full:
-            return U
-        return U[-1]
+    def nonlinear_hat(self, v, u, ops):
+        return -(self.dealias * self._fft(u**3, ops))
 
     def generate_ic(
         self,

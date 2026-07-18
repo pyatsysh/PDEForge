@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pdeforge"
-version = "0.1.0"
+version = "0.2.0.dev0"
 description = "A unified framework for generating PDE datasets for operator learning"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "Peter Yatsyshin", email = "pyatsyshin@turing.ac.uk"},
+    {name = "Peter Yatsyshin", email = "p.yatsyshin@icloud.com"},
 ]
 keywords = [
     "pde",
@@ -20,19 +20,19 @@ keywords = [
     "data-generation",
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering",
     "Topic :: Scientific/Engineering :: Physics",
     "Topic :: Scientific/Engineering :: Mathematics",
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 dependencies = [
     "numpy>=1.20",
     "scipy>=1.7",
@@ -55,13 +55,25 @@ notebook = [
 hdf5 = [
     "h5py>=3.0",
 ]
+zarr = [
+    "zarr>=2.16",
+]
+viz3d = [
+    "pyvista>=0.43",
+]
+jax = [
+    "jax>=0.4.20",
+]
+torch = [
+    "torch>=2.0",
+]
 # Note: FEniCSx must be installed via conda, not pip
 # conda install -c conda-forge fenics-dolfinx mpich petsc4py gmsh python-gmsh
 fenicsx = [
     "gmsh>=4.11",  # pip-installable part
 ]
 all = [
-    "pdeforge[dev,notebook,hdf5]",
+    "pdeforge[dev,notebook,hdf5,zarr,jax,torch,viz3d]",
 ]
 
 [project.urls]
@@ -75,7 +87,7 @@ include = ["pdeforge*"]
 
 [tool.black]
 line-length = 88
-target-version = ["py38", "py39", "py310", "py311"]
+target-version = ["py310", "py311", "py312"]
 
 [tool.isort]
 profile = "black"
@@ -86,7 +98,7 @@ testpaths = ["tests"]
 addopts = "-v --cov=pdeforge --cov-report=term-missing"
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.12"
 warn_return_any = false
 warn_unused_configs = true
 ignore_missing_imports = true

@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use PDEForge in your research, please cite it as below."
+title: "PDEForge: A Unified Framework for Generating PDE Datasets for Operator Learning"
+authors:
+  - family-names: Yatsyshin
+    given-names: Peter
+    orcid: "https://orcid.org/0000-0002-8844-281X"
+type: software
+license: MIT
+repository-code: "https://github.com/pyatsysh/PDEForge"
+keywords:
+  - partial differential equations
+  - operator learning
+  - neural operators
+  - data generation
+  - uncertainty quantification
+  - conformal prediction

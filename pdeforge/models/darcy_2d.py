@@ -30,6 +30,7 @@ class Darcy2D(PDEModel):
     """
 
     NDIM = 2
+    TIME_DEPENDENT = False  # steady elliptic solve
     DEFAULT_PARAMS = {
         "kappa_min": 0.1,
         "kappa_max": 10.0,

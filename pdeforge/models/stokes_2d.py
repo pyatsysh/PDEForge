@@ -47,6 +47,7 @@ class Stokes2D(PDEModel):
     """
 
     NDIM = 2
+    TIME_DEPENDENT = False  # steady elliptic solve
     INPUT_NAMES = ["fx", "fy"]
     OUTPUT_NAMES = ["u", "v", "p"]
 

@@ -50,6 +50,9 @@ class FEniCSModel(PDEModel):
     """
 
     BACKEND = "fenicsx"
+    BACKENDS = {"fenicsx"}
+    # dolfinx/PETSc objects are not picklable; MPI does not mix with pools.
+    PARALLEL_SAFE = False
 
     def __init__(self, resolution, domain=None, mesh_refinement=1, **params):
         """
@@ -64,6 +67,7 @@ class FEniCSModel(PDEModel):
             )
 
         super().__init__(resolution, domain, **params)
+        self.backend = "fenicsx"
 
         self.mesh_refinement = mesh_refinement
         self.output_resolution = resolution

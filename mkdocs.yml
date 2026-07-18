@@ -66,6 +66,7 @@ nav:
       - Available Models: guide/models.md
       - Parameter Exploration: guide/exploration.md
       - Data Formats: guide/data-formats.md
+      - Calibration Protocol: guide/calibration.md
   - Models:
       - Burgers 1D: models/burgers_1d.md
       - Darcy 2D: models/darcy_2d.md
@@ -75,4 +76,5 @@ nav:
       - Adding Custom Models: advanced/custom-models.md
       - Performance: advanced/performance.md
       - Stochastic Systems: advanced/stochastic.md
+  - Comparison: comparison.md
   - API Reference: api/reference.md

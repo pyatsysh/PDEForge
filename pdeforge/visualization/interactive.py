@@ -605,9 +605,7 @@ class DatasetExplorer:
 
             for i in range(n_inputs):
                 sl, idx = take_slice(inputs[..., i])
-                im = axes[i].imshow(
-                    sl, origin="lower", aspect="equal", cmap="viridis"
-                )
+                im = axes[i].imshow(sl, origin="lower", aspect="equal", cmap="viridis")
                 name = (
                     dataset.input_names[i]
                     if i < len(dataset.input_names)

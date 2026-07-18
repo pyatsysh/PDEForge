@@ -34,4 +34,4 @@ jobs:
           python -c "from pdeforge import list_models; print(list_models())"
 
       - name: Run FEniCSx tests
-        run: pytest tests/test_fenicsx.py -v || echo "FEniCSx tests skipped or failed"
+        run: pytest tests/test_fenicsx.py -v --override-ini addopts=

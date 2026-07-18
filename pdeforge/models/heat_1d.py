@@ -14,17 +14,16 @@ Operator Learning Task:
 from typing import Callable, Dict, Optional, Tuple, Union
 
 import numpy as np
-from scipy.integrate import odeint
 
-from pdeforge.core.base import PDEModel
 from pdeforge.core.params import ParamSpec, ParamType
 from pdeforge.core.registry import register_model
 from pdeforge.core.types import PDEDataset
 from pdeforge.generators.initial_conditions import get_ic_generator
+from pdeforge.solvers.semilinear import SemiLinearSpectralModel
 
 
 @register_model("heat_1d")
-class Heat1D(PDEModel):
+class Heat1D(SemiLinearSpectralModel):
     """
     1D Heat equation for diffusion processes.
 
@@ -86,25 +85,17 @@ class Heat1D(PDEModel):
         self.T = self.params.get("time_end", 1.0)
         self.n_t = self.params.get("_n_time_steps", 201)
 
+        self._setup_spectral()
         self.nx = resolution["x"]
         self.dx = self.grids["x"][1] - self.grids["x"][0]
-        self.k = 2 * np.pi * np.fft.fftfreq(self.nx, d=self.dx)
+        self.k = self.K[0]
 
-    def _rhs(self, u: np.ndarray, t: float) -> np.ndarray:
-        """Compute RHS: α ∂²u/∂x²"""
-        u_hat = np.fft.fft(u)
-        u_hat_xx = -self.k**2 * u_hat
-        u_xx = np.fft.ifft(u_hat_xx).real
-        return self.alpha * u_xx
+        # Purely linear: each substep applies the exact propagator
+        # exp(-alpha k^2 dt), so dt only sets the frame cadence.
+        self.dt = self.params.get("_dt") or self.T / max(1, self.n_t - 1)
 
-    def solve(self, ic: np.ndarray, return_full: bool = False) -> np.ndarray:
-        """Solve the heat equation."""
-        t = np.linspace(0, self.T, self.n_t)
-        U = odeint(self._rhs, ic, t, mxstep=5000)
-
-        if return_full:
-            return U
-        return U[-1]
+    def linear_symbol(self):
+        return -self.alpha * self.k**2
 
     def generate_ic(
         self,
@@ -116,12 +107,13 @@ class Heat1D(PDEModel):
         if generator_params is None:
             generator_params = {}
 
-        default_params = {
-            "n_modes": 10,
-            "decay": 1.5,
-            "amplitude": 1.0,
-        }
-        generator_params = {**default_params, **generator_params}
+        if generator == "fourier":
+            default_params = {
+                "n_modes": 10,
+                "decay": 1.5,
+                "amplitude": 1.0,
+            }
+            generator_params = {**default_params, **generator_params}
 
         if isinstance(generator, str):
             gen = get_ic_generator(generator, **generator_params)

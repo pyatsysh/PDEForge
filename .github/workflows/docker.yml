@@ -1,0 +1,33 @@
+name: Docker (FEniCSx image)
+
+# Manual trigger only: building/pushing the container image is an explicit
+# release action, not a per-commit side effect.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-fenicsx-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.fenicsx
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/pdeforge:fenicsx
+            ghcr.io/${{ github.repository_owner }}/pdeforge:fenicsx-${{ github.sha }}

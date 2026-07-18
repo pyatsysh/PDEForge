@@ -15,15 +15,15 @@ from typing import Callable, Dict, Optional, Tuple, Union
 
 import numpy as np
 
-from pdeforge.core.base import PDEModel
 from pdeforge.core.params import ParamSpec, ParamType
 from pdeforge.core.registry import register_model
 from pdeforge.core.types import PDEDataset
 from pdeforge.generators.initial_conditions import get_ic_generator
+from pdeforge.solvers.semilinear import SemiLinearSpectralModel
 
 
 @register_model("heat_2d")
-class Heat2D(PDEModel):
+class Heat2D(SemiLinearSpectralModel):
     """
     2D Heat equation for diffusion processes.
 
@@ -85,40 +85,16 @@ class Heat2D(PDEModel):
         self.T = self.params.get("time_end", 1.0)
         self.n_t = self.params.get("_n_time_steps", 101)
 
+        self._setup_spectral()
         self.nx = resolution["x"]
         self.ny = resolution["y"]
 
-        # Wavenumbers
-        dx = self.grids["x"][1] - self.grids["x"][0]
-        dy = self.grids["y"][1] - self.grids["y"][0]
-        kx = 2 * np.pi * np.fft.fftfreq(self.nx, d=dx)
-        ky = 2 * np.pi * np.fft.fftfreq(self.ny, d=dy)
-        self.KX, self.KY = np.meshgrid(kx, ky)
-        self.K2 = self.KX**2 + self.KY**2
+        # Purely linear: the seam applies the exact propagator per substep
+        # (û(k, t+dt) = û(k, t)·exp(-α|k|²dt)), so dt only sets frame cadence.
+        self.dt = self.params.get("_dt") or self.T / max(1, self.n_t - 1)
 
-    def solve(self, ic: np.ndarray, return_full: bool = False) -> np.ndarray:
-        """
-        Solve using exact solution in Fourier space.
-
-        For heat equation: û(k,t) = û(k,0) * exp(-α|k|²t)
-        """
-        t_array = np.linspace(0, self.T, self.n_t)
-
-        # Transform IC
-        u_hat_0 = np.fft.fft2(ic)
-
-        if return_full:
-            solutions = []
-            for t in t_array:
-                # Exact solution in Fourier space
-                u_hat_t = u_hat_0 * np.exp(-self.alpha * self.K2 * t)
-                u_t = np.fft.ifft2(u_hat_t).real
-                solutions.append(u_t)
-            return np.stack(solutions, axis=0)
-        else:
-            # Final time only
-            u_hat_T = u_hat_0 * np.exp(-self.alpha * self.K2 * self.T)
-            return np.fft.ifft2(u_hat_T).real
+    def linear_symbol(self):
+        return -self.alpha * self.K2
 
     def generate_ic(
         self,
@@ -130,12 +106,13 @@ class Heat2D(PDEModel):
         if generator_params is None:
             generator_params = {}
 
-        default_params = {
-            "n_modes": 8,
-            "decay": 2.0,
-            "amplitude": 1.0,
-        }
-        generator_params = {**default_params, **generator_params}
+        if generator == "fourier":
+            default_params = {
+                "n_modes": 8,
+                "decay": 2.0,
+                "amplitude": 1.0,
+            }
+            generator_params = {**default_params, **generator_params}
 
         if isinstance(generator, str):
             gen = get_ic_generator(generator, **generator_params)

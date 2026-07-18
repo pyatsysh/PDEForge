@@ -283,3 +283,120 @@ def mark_boundaries_rectangle(
 
     sorted_idx = np.argsort(facets)
     return dfx_mesh.meshtags(mesh, fdim, facets[sorted_idx], markers[sorted_idx])
+
+
+def create_channel_with_polygon(
+    polygon,
+    x_min: float = -1.0,
+    x_max: float = 3.0,
+    y_min: float = -1.0,
+    y_max: float = 1.0,
+    resolution: float = 0.08,
+    obstacle_resolution: float = None,
+    comm=None,
+) -> "dolfinx.mesh.Mesh":
+    """
+    Rectangular channel with a polygonal obstacle cut out (e.g. an airfoil).
+
+    polygon: (N, 2) closed polygon (first point == last point, or it will be
+    closed automatically). Boundary tags follow the cylinder convention:
+    1 = inlet (left), 2 = outlet (right), 3 = walls (top/bottom),
+    4 = obstacle surface. Mesh is refined near the obstacle via a
+    distance-threshold field.
+    """
+    if not HAS_GMSH:
+        raise ImportError(
+            "gmsh is required for mesh generation. Install with: pip install gmsh"
+        )
+    if not HAS_FENICSX:
+        raise ImportError(
+            "FEniCSx is required. Install with: conda install -c conda-forge fenics-dolfinx"
+        )
+
+    if comm is None:
+        comm = MPI.COMM_WORLD
+    if obstacle_resolution is None:
+        obstacle_resolution = resolution * 0.15
+
+    poly = np.asarray(polygon, dtype=float)
+    if not np.allclose(poly[0], poly[-1]):
+        poly = np.vstack([poly, poly[0]])
+    poly = poly[:-1]  # unique vertices; segments close the loop below
+
+    gmsh.initialize()
+    gmsh.model.add("channel_polygon")
+
+    if comm.rank == 0:
+        rect = gmsh.model.occ.addRectangle(
+            x_min, y_min, 0, x_max - x_min, y_max - y_min
+        )
+
+        pts = [
+            gmsh.model.occ.addPoint(px, py, 0.0, obstacle_resolution) for px, py in poly
+        ]
+        lines = [
+            gmsh.model.occ.addLine(pts[i], pts[(i + 1) % len(pts)])
+            for i in range(len(pts))
+        ]
+        loop = gmsh.model.occ.addCurveLoop(lines)
+        obstacle = gmsh.model.occ.addPlaneSurface([loop])
+
+        gmsh.model.occ.cut([(2, rect)], [(2, obstacle)])
+        gmsh.model.occ.synchronize()
+
+        surfaces = gmsh.model.getEntities(dim=2)
+        boundary = gmsh.model.getBoundary(surfaces, oriented=False)
+
+        inlet, outlet, walls, obstacle_boundary = [], [], [], []
+        for dim, tag in boundary:
+            com = gmsh.model.occ.getCenterOfMass(dim, tag)
+            if np.isclose(com[0], x_min):
+                inlet.append(tag)
+            elif np.isclose(com[0], x_max):
+                outlet.append(tag)
+            elif np.isclose(com[1], y_min) or np.isclose(com[1], y_max):
+                walls.append(tag)
+            else:
+                obstacle_boundary.append(tag)
+
+        gmsh.model.addPhysicalGroup(1, inlet, 1)
+        gmsh.model.setPhysicalName(1, 1, "inlet")
+        gmsh.model.addPhysicalGroup(1, outlet, 2)
+        gmsh.model.setPhysicalName(1, 2, "outlet")
+        gmsh.model.addPhysicalGroup(1, walls, 3)
+        gmsh.model.setPhysicalName(1, 3, "walls")
+        gmsh.model.addPhysicalGroup(1, obstacle_boundary, 4)
+        gmsh.model.setPhysicalName(1, 4, "obstacle")
+        gmsh.model.addPhysicalGroup(2, [s[1] for s in surfaces], 1)
+        gmsh.model.setPhysicalName(2, 1, "fluid")
+
+        gmsh.option.setNumber("Mesh.CharacteristicLengthMin", obstacle_resolution)
+        gmsh.option.setNumber("Mesh.CharacteristicLengthMax", resolution)
+
+        gmsh.model.mesh.field.add("Distance", 1)
+        gmsh.model.mesh.field.setNumbers(1, "CurvesList", obstacle_boundary)
+        gmsh.model.mesh.field.setNumber(1, "Sampling", 200)
+
+        gmsh.model.mesh.field.add("Threshold", 2)
+        gmsh.model.mesh.field.setNumber(2, "InField", 1)
+        gmsh.model.mesh.field.setNumber(2, "SizeMin", obstacle_resolution)
+        gmsh.model.mesh.field.setNumber(2, "SizeMax", resolution)
+        gmsh.model.mesh.field.setNumber(2, "DistMin", 0.05)
+        gmsh.model.mesh.field.setNumber(2, "DistMax", 0.8)
+        gmsh.model.mesh.field.setAsBackgroundMesh(2)
+
+        gmsh.model.mesh.generate(2)
+
+    result = gmshio.model_to_mesh(gmsh.model, comm, 0, gdim=2)
+    if hasattr(result, "mesh"):
+        mesh = result.mesh
+        cell_tags = result.cell_tags
+        facet_tags = result.facet_tags
+    else:
+        mesh, cell_tags, facet_tags = result
+
+    gmsh.finalize()
+
+    mesh.facet_tags = facet_tags
+    mesh.cell_tags = cell_tags
+    return mesh

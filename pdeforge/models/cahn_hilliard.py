@@ -277,11 +277,7 @@ class CahnHilliard(PDEModel):
             }
 
         mass_drift = float(np.abs(solution.mean() - ic.mean()))
-        is_valid = (
-            finite
-            and np.abs(solution).max() < 1.5
-            and mass_drift < 1e-4
-        )
+        is_valid = finite and np.abs(solution).max() < 1.5 and mass_drift < 1e-4
         return {
             "valid": is_valid,
             "mass_drift": mass_drift,

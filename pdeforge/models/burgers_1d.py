@@ -8,19 +8,22 @@ Operator learning task: u(x, t=0) -> u(x, t=T)
 """
 
 import numpy as np
-from scipy.integrate import odeint
 
-from pdeforge.core.base import PDEModel
 from pdeforge.core.params import ParamSpec, ParamType
 from pdeforge.core.registry import register_model
 from pdeforge.generators.initial_conditions import FourierICGenerator, get_ic_generator
+from pdeforge.solvers.semilinear import SemiLinearSpectralModel
 
 
 @register_model("burgers_1d")
-class Burgers1D(PDEModel):
+class Burgers1D(SemiLinearSpectralModel):
     """
     1D Burgers equation. Maps initial condition to solution at final time.
     Lower viscosity = sharper shocks.
+
+    Solved with ETDRK4 on the spectral seam: the stiff diffusion term is
+    integrated exactly, only the advection nonlinearity is stepped explicitly
+    (in conservative form, 2/3-dealiased).
     """
 
     NDIM = 1
@@ -49,6 +52,7 @@ class Burgers1D(PDEModel):
         "advection": 1.0,
         "time_horizon": 1.0,
         "_n_time_steps": 401,
+        "_dt": None,
     }
 
     def __init__(self, resolution, domain=None, **params):
@@ -59,50 +63,40 @@ class Burgers1D(PDEModel):
         self.T = self.params.get("time_horizon", self.params.get("time_end", 1.0))
         self.n_t = self.params.get("_n_time_steps", 401)
 
-        # precompute wavenumbers
+        self._setup_spectral()
         self.nx = resolution["x"]
         self.dx = self.grids["x"][1] - self.grids["x"][0]
-        self.k = 2 * np.pi * np.fft.fftfreq(self.nx, d=self.dx)
+        self.k = self.K[0]
 
-    def _rhs(self, u, t):
-        # cf. Anima et al
-        u_hat = np.fft.fft(u)
-        u_hat_x = 1j * self.k * u_hat
-        u_hat_xx = -self.k**2 * u_hat
+        # Advective CFL for the explicit nonlinear term; diffusion is exact.
+        dt = self.params.get("_dt")
+        if dt is None:
+            dt = min(self.T / 400.0, 0.5 * self.dx)
+        self.dt = dt
 
-        u_x = np.fft.ifft(u_hat_x).real
-        u_xx = np.fft.ifft(u_hat_xx).real
+    def linear_symbol(self):
+        return -self.nu * self.k**2
 
-        return -self.mu * u * u_x + self.nu * u_xx
-
-    def solve(self, ic, return_full=False):
-        """
-        Solve Burgers equation.
-
-        ic: initial condition u(x, t=0)
-        return_full: if True, return solution at all timesteps
-        """
-        t = np.linspace(0, self.T, self.n_t)
-        U = odeint(self._rhs, ic, t, mxstep=5000)
-
-        if return_full:
-            return U  # (n_t, nx)
-        else:
-            return U[-1]  # (nx,)
+    def nonlinear_hat(self, v, u, ops):
+        # Conservative form: -mu * d/dx (u^2 / 2), dealiased.
+        u2_hat = self._fft(u * u, ops)
+        return -0.5j * self.mu * self.k * (self.dealias * u2_hat)
 
     def generate_ic(self, generator="fourier", generator_params=None, seed=None):
         """Generate random IC using Fourier sine series."""
         if generator_params is None:
             generator_params = {}
 
-        # defaults for Burgers
-        default_params = {
-            "n_modes": 10,
-            "decay": 1.5,
-            "amplitude": 0.7,
-            "use_cos": False,
-        }
-        generator_params = {**default_params, **generator_params}
+        # defaults for Burgers (Fourier generator only — other generators
+        # have their own parameter sets)
+        if generator == "fourier":
+            default_params = {
+                "n_modes": 10,
+                "decay": 1.5,
+                "amplitude": 0.7,
+                "use_cos": False,
+            }
+            generator_params = {**default_params, **generator_params}
 
         if isinstance(generator, str):
             gen = get_ic_generator(generator, **generator_params)
