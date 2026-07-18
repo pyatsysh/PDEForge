@@ -1,0 +1,82 @@
+/* Nord theme, mapped from the author's site palette (data/themes/nord.toml):
+   light = snow storm surfaces + polar-night ink, header #2E3440 titled in
+   frost #88C0D0, hover in aurora #BF616A; dark = the inverse on #2E3440. */
+
+/* ---------- light: snow storm ---------- */
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #2e3440;
+  --md-primary-fg-color--light: #3b4252;
+  --md-primary-fg-color--dark: #2e3440;
+  --md-primary-bg-color: #eceff4;
+  --md-primary-bg-color--light: #d8dee9;
+
+  --md-accent-fg-color: #bf616a;
+  --md-accent-fg-color--transparent: rgba(191, 97, 106, 0.1);
+
+  --md-default-bg-color: #eceff4;
+  --md-default-fg-color: #2e3440;
+  --md-default-fg-color--light: #4c566a;
+  --md-default-fg-color--lighter: #6b7489;
+  --md-default-fg-color--lightest: #d8dee9;
+
+  --md-typeset-color: #2e3440;
+  --md-typeset-a-color: #5e81ac;
+
+  --md-code-bg-color: #e5e9f0;
+  --md-code-fg-color: #2e3440;
+  --md-code-hl-color: rgba(136, 192, 208, 0.25);
+
+  --md-footer-bg-color: #2e3440;
+  --md-footer-bg-color--dark: #242933;
+  --md-footer-fg-color: #eceff4;
+}
+
+/* ---------- dark: polar night ---------- */
+[data-md-color-scheme="slate"] {
+  --md-hue: 220; /* fallback hue; explicit colors below win */
+
+  --md-primary-fg-color: #2e3440;
+  --md-primary-fg-color--light: #3b4252;
+  --md-primary-fg-color--dark: #242933;
+  --md-primary-bg-color: #eceff4;
+
+  --md-accent-fg-color: #bf616a;
+  --md-accent-fg-color--transparent: rgba(191, 97, 106, 0.15);
+
+  --md-default-bg-color: #2e3440;
+  --md-default-fg-color: #eceff4;
+  --md-default-fg-color--light: #d8dee9;
+  --md-default-fg-color--lighter: #81a1c1;
+  --md-default-fg-color--lightest: #434c5e;
+
+  --md-typeset-color: #d8dee9;
+  --md-typeset-a-color: #88c0d0;
+
+  --md-code-bg-color: #3b4252;
+  --md-code-fg-color: #d8dee9;
+  --md-code-hl-color: rgba(136, 192, 208, 0.18);
+
+  --md-footer-bg-color: #242933;
+  --md-footer-bg-color--dark: #1e222a;
+  --md-footer-fg-color: #d8dee9;
+
+  /* tables / admonition surfaces on the raised polar-night step */
+  --md-typeset-table-color: rgba(216, 222, 233, 0.12);
+  --md-admonition-bg-color: #3b4252;
+}
+
+/* header title picks up the site's frost accent on hover/active */
+.md-header__title:hover,
+.md-tabs__link--active {
+  color: #88c0d0;
+}
+
+/* keep the frost/aurora link behaviour of the site: frost links, aurora hover */
+.md-typeset a:hover {
+  color: #bf616a;
+}
+
+/* gallery images sit on polar night in both schemes — frame them gently */
+.md-typeset img {
+  border-radius: 4px;
+}

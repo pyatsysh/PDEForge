@@ -19,8 +19,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 OUT = Path(__file__).resolve().parents[1] / "docs" / "figures"
-SURFACE = "#0d1117"
-INK = "#8b949e"
+SURFACE = "#2E3440"
+INK = "#D8DEE9"
 DPI = 200
 
 

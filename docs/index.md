@@ -70,8 +70,9 @@ Every image below is package output — regenerate them all with
 | Spatiotemporal chaos, x vs t (`ks_1d`) | Wavefronts refracting through a random medium (`heterogeneous_wave_2d`) |
 | ![Darcy 3D](figures/darcy3d_hero.png) | ![3D spinodal decomposition](figures/spinodal3d.png) |
 | Canonical Darcy pressure in 3D (`darcy_fno_3d`) | The u = 0 interface of 3D spinodal decomposition (`cahn_hilliard`) |
-| ![Vortex shedding](figures/cylinder_flow_animation.gif) | ![Darcy permeability to pressure](figures/darcy_2d.png) |
-| von Karman vortex street (`cylinder_flow_2d_unsteady`) | Permeability to pressure (`darcy_2d`) |
+
+![Vortex shedding behind a cylinder](figures/cylinder_flow_animation.gif)
+*von Karman vortex street (`cylinder_flow_2d_unsteady`)*
 
 ## Install
 
