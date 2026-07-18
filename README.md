@@ -4,7 +4,7 @@
 
 **A unified framework for generating PDE datasets for operator learning and uncertainty quantification.**
 
-![PDEForge Overview](notebooks/figures/pdeforge_overview.png)
+![PDEForge: six PDE textures](docs/figures/banner.png)
 
 PDEForge provides a simple, unified interface to generate training data for functional learning tasks from various PDE models. It is designed with **uncertainty quantification (UQ)** as a first-class concern.
 
@@ -30,6 +30,11 @@ metadata — lands in `./data/naca`. No compiler, no conda, no PETSc build.
 The same command works for every one of the 37 models, and
 `pdeforge reproduce metadata.json` regenerates any dataset bit-for-bit:
 the container pins the environment, the metadata pins the run.
+
+Pull the image on any machine with Docker and watch an airfoil dataset
+appear from one line:
+
+![Flow past a NACA 4412 airfoil](docs/figures/naca_flow.png)
 
 ## Why PDEForge?
 

@@ -162,3 +162,23 @@ class TestBackendResolution:
 
         with pytest.raises(ValueError):
             resolve_backend(get_model("cahn_hilliard"), "jax")
+
+
+class TestJaxMultiComponent:
+    """Regression: the engine probe must use the state shape (component
+    axis included), not the scalar field shape."""
+
+    @pytest.fixture(autouse=True)
+    def _need_jax(self):
+        pytest.importorskip("jax")
+
+    def test_gray_scott_jax_matches_numpy(self):
+        from pdeforge import get_model
+
+        kw = dict(resolution={"x": 24, "y": 24}, time_end=200.0, _dt=1.0)
+        m_np = get_model("gray_scott_2d")(**kw)
+        ic = m_np.generate_ic(seed=3)
+        u_np = m_np.solve(ic)
+        m_jx = get_model("gray_scott_2d")(backend="jax", **kw)
+        u_jx = m_jx.solve(ic)
+        assert np.allclose(u_np, u_jx, rtol=1e-8, atol=1e-10)

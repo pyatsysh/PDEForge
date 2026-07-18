@@ -35,8 +35,11 @@ def _make_step(model, C):
     def N_of(v, u):
         return model.nonlinear_hat(v, u, ops)
 
-    # Detect purely linear problems once, on a dummy state.
-    probe = jnp.zeros(model.field_shape, dtype=jnp.complex128)
+    # Detect purely linear problems once, on a dummy state. The state shape
+    # is the LINEAR SYMBOL's shape (a leading component axis for systems
+    # like Gray-Scott), not the scalar field_shape.
+    state_shape = np.asarray(model.linear_symbol()).shape
+    probe = jnp.zeros(state_shape, dtype=jnp.complex128)
     linear_only = model.nonlinear_hat(probe, model._ifft(probe, ops), ops) is None
 
     if linear_only:

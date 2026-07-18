@@ -97,7 +97,9 @@ class NSVorticity2D(SemiLinearSpectralModel):
         dx = self.grids["x"][1] - self.grids["x"][0]
         dt = self.params.get("_dt")
         if dt is None:
-            dt = min(0.5 * dx, self.T / 500.0)
+            # conservative advective CFL; strongly forced / low-viscosity runs
+            # reach velocity scales ~ f0/(nu n^2) and should pass _dt explicitly
+            dt = min(0.25 * dx, self.T / 500.0)
         self.dt = dt
 
         # Steady forcing (in vorticity form: curl of the velocity forcing).

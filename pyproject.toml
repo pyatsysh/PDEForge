@@ -81,7 +81,7 @@ pdeforge = "pdeforge.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/pyatsysh/pdeforge"
-Documentation = "https://pyatsysh.github.io/pdeforge"
+Documentation = "https://pyatsysh.github.io/PDEForge"
 Repository = "https://github.com/pyatsysh/pdeforge"
 
 [tool.setuptools.packages.find]
