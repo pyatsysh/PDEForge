@@ -21,6 +21,7 @@ class TestFEniCSxRegistry:
             "cylinder_flow_2d_unsteady",
             "cylinder_flow_2d_parameterized",
             "cylinder_flow_2d_turbulent",
+            "elasticity_2d",
         }
         missing = expected - names
         assert not missing, f"FEM models not registered: {missing}"
@@ -77,3 +78,38 @@ class TestDivergenceFree:
             div = du + dv
             inner = div[4:-4, 4:-4]
             assert np.median(np.abs(inner)) < 0.5 * np.abs(u).max()
+
+
+class TestElasticity2D:
+    def test_energy_balance_and_shapes(self):
+        """Clapeyron: strain energy = half the external work, at solver
+        precision, for the heterogeneous-inclusion sample."""
+        m = get_model("elasticity_2d")(resolution={"x": 48, "y": 48}, _mesh_n=32)
+        ic, sol, info = m.generate_sample(seed=3)
+        assert ic.shape == (48, 48)
+        assert set(np.round(np.unique(ic), 6)) == {1.0, 10.0}
+        assert sol.shape == (48, 48, 3)
+        assert np.isfinite(sol).all()
+        assert info["valid"]
+        assert info["energy_balance"] < 1e-10
+
+    def test_stiffer_matrix_displaces_less(self):
+        """Doubling every modulus halves the displacement (linearity)."""
+        m = get_model("elasticity_2d")(resolution={"x": 32, "y": 32}, _mesh_n=24)
+        ic = m.generate_ic(seed=7)
+        u1 = m.solve(ic)[..., :2]
+        u2 = m.solve(2.0 * ic)[..., :2]
+        assert np.allclose(u2, 0.5 * u1, rtol=1e-8, atol=1e-12)
+
+    def test_dataset_generation(self):
+        d = generate_dataset(
+            "elasticity_2d",
+            n_samples=2,
+            resolution={"x": 32, "y": 32},
+            params={"_mesh_n": 24},
+            seed=0,
+            verbose=False,
+        )
+        assert d.inputs.shape == (2, 32, 32)
+        assert d.outputs.shape == (2, 32, 32, 3)
+        assert d.metadata["backend"] == "fenicsx"

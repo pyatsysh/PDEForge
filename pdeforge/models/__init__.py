@@ -147,6 +147,11 @@ try:
     from pdeforge.models.naca_flow_2d import NACAFlow2D
 
     __all__.append("NACAFlow2D")
+
+    from pdeforge.models import elasticity_2d
+    from pdeforge.models.elasticity_2d import Elasticity2D
+
+    __all__.append("Elasticity2D")
 except ImportError:
     # FEniCSx not available - skip
     pass
