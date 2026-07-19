@@ -11,7 +11,7 @@ hide:
 # PDE<span class="pf-accent">Forge</span>
 
 <p class="pf-tagline">PDEForge turns PDE solvers into training data. One
-command runs any of its 37 models; the finite-element stack ships inside
+command runs any of its 40 models; the finite-element stack ships inside
 the Docker image, and every dataset carries a calibration split reserved
 for uncertainty quantification. Every physical parameter is a per-sample
 input, down to the position of the cylinder in the turbulent wake.</p>
@@ -52,12 +52,14 @@ data = pdeforge.generate_dataset("ns_vorticity_2d", n_samples=1000,
 splits = data.split(train=0.6, val=0.15, cal=0.15, test=0.1)
 ```
 
-- **37 models**: spectral (Burgers, Navier-Stokes vorticity, Kolmogorov
+- **40 models**: spectral (Burgers, Navier-Stokes vorticity, Kolmogorov
   flow, Kuramoto-Sivashinsky, KdV, Schrodinger, shallow water, Gray-Scott,
   phase-field families, stochastic PDEs, 3D diffusion and Allen-Cahn),
   finite-difference elliptic (the canonical Darcy benchmark, 2D and 3D),
-  and finite-element flows (cylinder families, LES turbulence, NACA
-  airfoils); see [Available Models](guide/models.md).
+  and finite-element models (cylinder families, LES turbulence, NACA
+  airfoils, inclusion elasticity, Rayleigh-Benard convection, Darcy flow
+  through Cahn-Hilliard microstructures); see
+  [Available Models](guide/models.md).
 - **The canon, regenerable**: classic benchmark setups ship as presets with
   every hyperparameter exposed. The Darcy generator reproduces the
   distributed FNO data to 0.49% relative L2, with the input measure

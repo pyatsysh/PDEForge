@@ -157,6 +157,11 @@ try:
     from pdeforge.models.porous_darcy_fem import PorousDarcyFEM
 
     __all__.append("PorousDarcyFEM")
+
+    from pdeforge.models import rayleigh_benard_2d
+    from pdeforge.models.rayleigh_benard_2d import RayleighBenard2D
+
+    __all__.append("RayleighBenard2D")
 except ImportError:
     # FEniCSx not available - skip
     pass

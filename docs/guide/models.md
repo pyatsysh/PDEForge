@@ -120,6 +120,53 @@ dataset = generate_dataset(
 # Output shape: (10, 81, 41, 110, 3)
 ```
 
+### Elasticity 2D (`elasticity_2d`)
+
+Plane-strain linear elasticity with random stiff inclusions; the operator
+task maps the Young's-modulus field to displacement and von Mises stress.
+Validated by the Clapeyron energy balance at solver precision.
+
+```python
+dataset = generate_dataset(
+    model="elasticity_2d",
+    n_samples=100,
+    resolution={"x": 64, "y": 64},
+    params={"e_inclusion": 10.0, "traction_y": -1.0},
+)
+```
+
+### Rayleigh-Benard 2D (`rayleigh_benard_2d`)
+
+Boussinesq convection in the closed unit cavity (hot bottom, cold top,
+no-slip walls). Below Ra_c the solver returns the conduction state with
+Nu = 1; above it, convection rolls whose selection depends on the seeded
+perturbation. Plate-averaged Nusselt numbers are stored per solve.
+
+```python
+dataset = generate_dataset(
+    model="rayleigh_benard_2d",
+    n_samples=20,
+    resolution={"x": 64, "y": 64},
+    params={"rayleigh": 1e4, "prandtl": 0.71},
+)
+```
+
+### Porous Darcy FEM (`porous_darcy_fem`)
+
+The cross-model pipeline: a seeded Cahn-Hilliard run grows a two-phase
+morphology, binarized into a permeability field; steady Darcy flow crosses
+it under a unit pressure drop. Effective permeability is stored per
+sample; flux balance and the pressure maximum principle are validated.
+
+```python
+dataset = generate_dataset(
+    model="porous_darcy_fem",
+    n_samples=100,
+    resolution={"x": 64, "y": 64},
+    params={"ch_time": 8.0, "permeability_contrast": 1e3},
+)
+```
+
 ## Model Information
 
 Use `describe_model` to see configurable parameters:

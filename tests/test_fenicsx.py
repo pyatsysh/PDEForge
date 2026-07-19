@@ -23,6 +23,7 @@ class TestFEniCSxRegistry:
             "cylinder_flow_2d_turbulent",
             "elasticity_2d",
             "porous_darcy_fem",
+            "rayleigh_benard_2d",
         }
         missing = expected - names
         assert not missing, f"FEM models not registered: {missing}"
@@ -138,3 +139,36 @@ class TestPorousDarcyFEM:
         hi.solve(hi.generate_ic(seed=5))
         lo.solve(lo.generate_ic(seed=5))
         assert lo._last_flux["k_eff"] > hi._last_flux["k_eff"]
+
+
+class TestRayleighBenard2D:
+    def test_subcritical_conduction(self):
+        """Below Ra_c ~ 1708 the cavity relaxes to conduction: Nu = 1 at
+        both plates and the velocity decays to zero."""
+        m = get_model("rayleigh_benard_2d")(
+            resolution={"x": 24, "y": 24},
+            rayleigh=800.0,
+            time_end=0.4,
+            _mesh_n=20,
+        )
+        sol = m.solve(m.generate_ic(seed=1))
+        assert np.isfinite(sol).all()
+        assert abs(m._last_nusselt["Nu_bottom"] - 1.0) < 0.01
+        assert abs(m._last_nusselt["Nu_top"] - 1.0) < 0.01
+        assert np.abs(sol[..., :2]).max() < 5e-3
+
+    def test_supercritical_nusselt_vs_literature(self):
+        """Ra = 1e4, Pr = 0.71 square cavity: plate-averaged Nu matches
+        the benchmark value 2.158 (Ouertatani et al. 2008). Measured
+        2.165 at this coarse config."""
+        m = get_model("rayleigh_benard_2d")(
+            resolution={"x": 24, "y": 24},
+            rayleigh=1e4,
+            prandtl=0.71,
+            time_end=0.3,
+            _mesh_n=24,
+        )
+        m.solve(m.generate_ic(seed=1))
+        nu = m._last_nusselt["Nu_bottom"]
+        assert abs(nu - 2.158) / 2.158 < 0.05
+        assert m._last_nusselt["imbalance"] < 0.05

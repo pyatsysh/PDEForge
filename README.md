@@ -27,7 +27,7 @@ Every sample draws its own airfoil (thickness, camber, angle of attack), the
 channel is re-meshed, the flow is solved, and the dataset (SDF geometry
 channel, velocity/pressure fields, lift/drag coefficients, full provenance
 metadata) lands in `./data/naca`. No compiler, no conda, no PETSc build.
-The same command works for every one of the 37 models, and
+The same command works for every one of the 40 models, and
 `pdeforge reproduce metadata.json` regenerates any dataset bit-for-bit:
 the container pins the environment, the metadata pins the run.
 
@@ -90,7 +90,7 @@ Skip installation entirely: the container ships everything (including the
 FEniCSx stack in the `:fenicsx` tag) and datasets land in a mounted folder:
 
 ```bash
-# spectral models (32 of 37): slim image
+# spectral models (32 of 40): slim image
 docker run -v $PWD/data:/data ghcr.io/pyatsysh/pdeforge \
     pdeforge generate --preset fno_darcy_2d --n 1024 \
     --resolution x=421 y=421 --seed 0 --out /data/darcy421
@@ -577,7 +577,7 @@ print(describe_model("burgers_1d"))
 
 ## Model Catalogue
 
-### Available Now: 37 Models
+### Available Now: 40 Models
 
 | Model | Type | Dimensions | Backend |
 |-------|------|------------|---------|
@@ -618,6 +618,9 @@ print(describe_model("burgers_1d"))
 | `darcy_fno_2d` | Canonical FNO Darcy (validated, knobbed) | 2D | FD direct |
 | `darcy_fno_3d` | Canonical Darcy measure in 3D (CG solver) | 3D | FD/CG |
 | `naca_flow_2d` | NACA airfoil family (SDF → flow + Cl/Cd) | 2D | FEniCSx |
+| `elasticity_2d` | Plane-strain elasticity, random inclusions (E → u, von Mises) | 2D | FEniCSx |
+| `rayleigh_benard_2d` | Rayleigh-Benard convection (Ra, Pr; Nusselt-validated) | 2D+t | FEniCSx |
+| `porous_darcy_fem` | Darcy flow through Cahn-Hilliard microstructures | 2D | FEniCSx |
 
 "(+JAX)" marks models on the solver seam that also run on the optional
 GPU-capable JAX backend: `generate_dataset(..., backend="jax")`.
