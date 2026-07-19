@@ -1,12 +1,12 @@
 site_name: PDEForge
 site_description: A unified framework for generating PDE datasets for operator learning
 site_url: https://pyatsysh.github.io/PDEForge
-copyright: "© 2026 Peter Yatsyshin · MIT License"
 repo_url: https://github.com/pyatsysh/pdeforge
 repo_name: pyatsysh/pdeforge
 
 theme:
   name: material
+  custom_dir: overrides
   font:
     # the site's font2 set: Crimson Text body, Roboto Mono code
     # (Fredericka the Great / Headland One display faces load in nord.css)
