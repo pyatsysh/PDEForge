@@ -14,14 +14,14 @@ hide:
 command runs any of its 37 models; the finite-element stack ships inside
 the Docker image, and every dataset carries a calibration split reserved
 for uncertainty quantification. Every physical parameter is a per-sample
-input — down to the position of the cylinder in the turbulent wake.</p>
+input, down to the position of the cylinder in the turbulent wake.</p>
 
 [github.com/pyatsysh/PDEForge](https://github.com/pyatsysh/PDEForge){ .md-button .md-button--primary }
 [Quickstart](getting-started/quickstart.md){ .md-button }
 </div>
 <figure class="pf-hero-fig" markdown>
 ![Flow past a NACA 4412 airfoil at 6 degrees](figures/naca_flow.png)
-<figcaption>Flow past a NACA 4412 airfoil, AoA 6° — one command:
+<figcaption>Flow past a NACA 4412 airfoil, AoA 6°: one command for
 geometry, mesh, solve, splits.</figcaption>
 </figure>
 </div>
@@ -40,8 +40,8 @@ coefficients, and full provenance metadata.
 ## What PDEForge is
 
 A unified framework for generating PDE datasets for operator learning and
-uncertainty quantification. One call — `generate_dataset()` in Python or
-`pdeforge generate` on the command line — serves every model, at any
+uncertainty quantification. One call, `generate_dataset()` in Python or
+`pdeforge generate` on the command line, serves every model, at any
 resolution, with any parameters, seeded and reproducible:
 
 ```python
@@ -57,15 +57,15 @@ splits = data.split(train=0.6, val=0.15, cal=0.15, test=0.1)
   phase-field families, stochastic PDEs, 3D diffusion and Allen-Cahn),
   finite-difference elliptic (the canonical Darcy benchmark, 2D and 3D),
   and finite-element flows (cylinder families, LES turbulence, NACA
-  airfoils) — see [Available Models](guide/models.md).
+  airfoils); see [Available Models](guide/models.md).
 - **The canon, regenerable**: classic benchmark setups ship as presets with
   every hyperparameter exposed. The Darcy generator reproduces the
   distributed FNO data to 0.49% relative L2, with the input measure
-  recovered from the data itself (spectrum fit R^2 = 0.998) — and extends
+  recovered from the data itself (spectrum fit R^2 = 0.998), and extends
   the same measure to 3D, where no frozen dataset exists.
 - **UQ-native**: dedicated calibration splits for conformal prediction,
   out-of-distribution splits by parameter range, multi-fidelity pairs,
-  observation operators — see the [Calibration Protocol](guide/calibration.md).
+  observation operators; see the [Calibration Protocol](guide/calibration.md).
 - **Verified ground truth**: `pdeforge.verify` runs convergence studies so
   the data comes with numerical error estimates; every model carries a
   physics-validation test (conservation laws, exact solutions).
@@ -78,12 +78,12 @@ splits = data.split(train=0.6, val=0.15, cal=0.15, test=0.1)
 
 ## Gallery
 
-Every image is package output — regenerate them all with
+Every image is package output: regenerate them all with
 `python scripts/make_gallery.py`.
 
 ![Six PDE textures](figures/banner.png)
 
-The full set — including the motion loops — lives in the
+The full set, including the motion loops, lives in the
 [**Gallery**](gallery.md).
 
 ## Install
