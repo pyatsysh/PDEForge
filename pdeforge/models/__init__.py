@@ -152,6 +152,11 @@ try:
     from pdeforge.models.elasticity_2d import Elasticity2D
 
     __all__.append("Elasticity2D")
+
+    from pdeforge.models import porous_darcy_fem
+    from pdeforge.models.porous_darcy_fem import PorousDarcyFEM
+
+    __all__.append("PorousDarcyFEM")
 except ImportError:
     # FEniCSx not available - skip
     pass

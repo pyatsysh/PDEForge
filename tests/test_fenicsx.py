@@ -22,6 +22,7 @@ class TestFEniCSxRegistry:
             "cylinder_flow_2d_parameterized",
             "cylinder_flow_2d_turbulent",
             "elasticity_2d",
+            "porous_darcy_fem",
         }
         missing = expected - names
         assert not missing, f"FEM models not registered: {missing}"
@@ -113,3 +114,27 @@ class TestElasticity2D:
         assert d.inputs.shape == (2, 32, 32)
         assert d.outputs.shape == (2, 32, 32, 3)
         assert d.metadata["backend"] == "fenicsx"
+
+
+class TestPorousDarcyFEM:
+    def test_pipeline_flux_and_bounds(self):
+        """CH morphology -> binary k -> Darcy: flux balances across the
+        pressure boundaries and p obeys the maximum principle."""
+        m = get_model("porous_darcy_fem")(resolution={"x": 48, "y": 48}, _mesh_n=40)
+        ic, sol, info = m.generate_sample(seed=11)
+        assert ic.shape == (48, 48)
+        ks = np.unique(ic)
+        assert len(ks) == 2 and ks.max() == 1.0 and ks.min() == 1e-3
+        assert sol.shape == (48, 48, 3)
+        assert info["valid"]
+        assert info["flux_imbalance"] < 0.05
+        assert 0.0 < info["k_eff"] < 1.0
+
+    def test_contrast_monotonicity(self):
+        """Lowering the contrast (more permeable solid) raises k_eff."""
+        kw = dict(resolution={"x": 40, "y": 40}, _mesh_n=32)
+        hi = get_model("porous_darcy_fem")(permeability_contrast=1e3, **kw)
+        lo = get_model("porous_darcy_fem")(permeability_contrast=1e1, **kw)
+        hi.solve(hi.generate_ic(seed=5))
+        lo.solve(lo.generate_ic(seed=5))
+        assert lo._last_flux["k_eff"] > hi._last_flux["k_eff"]
