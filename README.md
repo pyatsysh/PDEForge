@@ -10,9 +10,9 @@ PDEForge provides a simple, unified interface to generate training data for func
 
 ## FEM Training Data Without Installing FEniCS
 
-PDEForge ships **finite-element training-data generators** — steady and
+PDEForge ships **finite-element training-data generators** (steady and
 vortex-shedding cylinder flows, Smagorinsky LES turbulence, and a
-**parameterised NACA airfoil family** with per-sample lift and drag — and you
+**parameterised NACA airfoil family** with per-sample lift and drag), and you
 **never install FEniCSx**. The FEM stack (PETSc, MPI, gmsh, dolfinx) is
 famously painful to build; here it lives inside a container, solved once in
 CI, and you drive it from one command:
@@ -24,9 +24,9 @@ docker run -v $PWD/data:/data ghcr.io/pyatsysh/pdeforge:fenicsx \
 ```
 
 Every sample draws its own airfoil (thickness, camber, angle of attack), the
-channel is re-meshed, the flow is solved, and the dataset — SDF geometry
+channel is re-meshed, the flow is solved, and the dataset (SDF geometry
 channel, velocity/pressure fields, lift/drag coefficients, full provenance
-metadata — lands in `./data/naca`. No compiler, no conda, no PETSc build.
+metadata) lands in `./data/naca`. No compiler, no conda, no PETSc build.
 The same command works for every one of the 37 models, and
 `pdeforge reproduce metadata.json` regenerates any dataset bit-for-bit:
 the container pins the environment, the metadata pins the run.
@@ -45,7 +45,7 @@ appear from one line:
 | No way to explore before downloading | Interactive visualization |
 | No stochastic/UQ-ready datasets | Built-in support for stochastic PDEs |
 | Unclear train/val/test splits | Dedicated calibration split for UQ |
-| FEM data means installing FEniCS | One docker command — never install it |
+| FEM data means installing FEniCS | One docker command: never install it |
 
 PDEForge is built to serve uncertainty quantification workflows for neural operators: every dataset can carry a dedicated calibration split for conformal prediction (see [UQ Workflow](#uq-workflow) below).
 
@@ -86,22 +86,22 @@ These scripts create conda environments, install dependencies, register Jupyter 
 
 ### Zero-Install: the Docker Appliance
 
-Skip installation entirely — the container ships everything (including the
+Skip installation entirely: the container ships everything (including the
 FEniCSx stack in the `:fenicsx` tag) and datasets land in a mounted folder:
 
 ```bash
-# spectral models (32 of 37) — slim image
+# spectral models (32 of 37): slim image
 docker run -v $PWD/data:/data ghcr.io/pyatsysh/pdeforge \
     pdeforge generate --preset fno_darcy_2d --n 1024 \
     --resolution x=421 y=421 --seed 0 --out /data/darcy421
 
-# FEM models too (cylinder flows, NACA airfoils) — full image
+# FEM models too (cylinder flows, NACA airfoils): full image
 docker run -v $PWD/data:/data ghcr.io/pyatsysh/pdeforge:fenicsx \
     pdeforge generate --model naca_flow_2d --n 100 \
     --resolution x=96 y=48 --seed 0 --out /data/naca
 ```
 
-GPU images add JAX CUDA wheels — the spectral models accelerate on any
+GPU images add JAX CUDA wheels: the spectral models accelerate on any
 NVIDIA GPU (host needs the driver + nvidia-container-toolkit; FEM models
 run on CPU in all images):
 
@@ -116,7 +116,7 @@ docker run --gpus all -v $PWD/data:/data ghcr.io/pyatsysh/pdeforge:fenicsx-cuda 
 
 The same CLI works in any local install: `pdeforge generate|reproduce|models|presets|describe`.
 `pdeforge reproduce metadata.json --out ./again` regenerates any seeded
-dataset from its own metadata — the container pins the environment, the
+dataset from its own metadata: the container pins the environment, the
 metadata pins the run.
 
 ### Why Two Installation Options?
@@ -135,7 +135,7 @@ PDEForge offers two installation paths because of the trade-off between simplici
 - 2D: Darcy flow, Stokes flow, Heat, Wave, Allen-Cahn, FitzHugh-Nagumo, Stochastic Heat
 - 2D / 3D: Cahn-Hilliard (spinodal decomposition)
 
-FEniCSx is only needed for **complex geometries** (e.g., flow around obstacles) where spectral methods don't apply. If you're unsure, start with the basic installation—you can always add FEniCSx later.
+FEniCSx is only needed for **complex geometries** (e.g., flow around obstacles) where spectral methods don't apply. If you're unsure, start with the basic installation: you can always add FEniCSx later.
 
 ## Quick Start
 
@@ -833,7 +833,7 @@ This is a known limitation of FEniCSx in Jupyter environments, not a PDEForge is
 
 PDEForge is designed as the data layer for uncertainty quantification in neural
 operators. The dedicated calibration split makes split-conformal prediction a
-first-class citizen — no hand-slicing calibration data out of your training set.
+first-class citizen: no hand-slicing calibration data out of your training set.
 
 **Typical workflow (with any surrogate + any conformal library):**
 

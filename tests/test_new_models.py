@@ -401,3 +401,33 @@ class TestRegistryCount:
         }
         missing = expected - names
         assert not missing, f"unregistered models: {missing}"
+
+
+def test_fhn_broken_front_regimes():
+    """beta gates whether broken wavefronts survive: 0.7 (default) is
+    sub-excitable and the fragment dies; 0.5 sustains curling waves."""
+    from pdeforge import get_model
+
+    def final_activity(beta, u_rest):
+        v_rest = (u_rest + beta) / 0.8
+        m = get_model("fitzhugh_nagumo_2d")(
+            resolution={"x": 128, "y": 128},
+            domain={"x": (0.0, 60.0), "y": (0.0, 60.0)},
+            epsilon=0.02,
+            beta=beta,
+            time_end=200.0,
+            _n_time_steps=11,
+            _dt=0.05,
+        )
+        x, y = m.grids["x"], m.grids["y"]
+        X, Y = np.meshgrid(x, y)
+        u0 = np.full_like(X, u_rest)
+        v0 = np.full_like(X, v_rest)
+        u0[(np.abs(Y - 30.0) < 8.0) & (X < 33.0)] = 1.0  # broken stripe
+        v0[(Y < 22.0) & (X < 33.0)] = v_rest + 0.45  # refractory block
+        traj = m.solve(u0, ic_v=v0, return_full=True)
+        return (traj[-1, :, :, 0] > 0).mean()
+
+    # rest state: most negative root of 0.8 u^3 + 0.2 u + beta = 0
+    assert final_activity(0.5, -0.76) > 0.02
+    assert final_activity(0.7, -0.87) < 0.005

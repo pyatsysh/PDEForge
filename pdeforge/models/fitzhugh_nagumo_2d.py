@@ -35,6 +35,17 @@ class FitzHughNagumo2D(PDEModel):
 
     Can produce spiral waves and complex spatiotemporal patterns.
 
+    Excitability regimes (validated numerically; see
+    tests/test_new_models.py::test_fhn_broken_front_regimes): with the
+    default beta = 0.7 the medium is sub-excitable: plane fronts
+    propagate, but a broken wavefront retracts from its free ends and
+    dies, so no spiral can form from a wave break. Around beta = 0.5
+    (with epsilon ~ 0.02) the medium is fully excitable: broken fronts
+    curl at the tips, collide and re-seed indefinitely. Excitation seeds
+    must span roughly 8 units of sqrt(D_u) for a pulse to launch at all.
+    The website's motion loop uses the excitable recipe
+    (scripts/make_gallery.py, motion_fhn_spiral).
+
     Examples
     --------
     >>> dataset = generate_dataset(
