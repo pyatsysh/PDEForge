@@ -2,6 +2,8 @@
 
 **Author: Peter Yatsyshin**
 
+**Documentation: [pyatsysh.github.io/PDEForge](https://pyatsysh.github.io/PDEForge/)**
+
 **A unified framework for generating PDE datasets for operator learning and uncertainty quantification.**
 
 ![PDEForge: six PDE textures](docs/figures/banner.png)
