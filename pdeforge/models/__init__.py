@@ -8,6 +8,7 @@
 # Heat equation
 from pdeforge.models import (
     advection_1d,
+    airfoil_euler_2d,
     allen_cahn_1d,
     allen_cahn_2d,
     allen_cahn_3d,
@@ -87,6 +88,7 @@ __all__ = [
     "Advection1D",
     "DarcyFNO2D",
     "DarcyFNO3D",
+    "AirfoilEuler2D",
     "KdV1D",
     "LotkaVolterra2D",
     "Burgers2D",
@@ -109,6 +111,7 @@ from pdeforge.models.gray_scott_2d import GrayScott2D
 from pdeforge.models.heat_3d import Heat3D
 from pdeforge.models.helmholtz_2d import Helmholtz2D
 from pdeforge.models.heterogeneous_wave_2d import HeterogeneousWave2D
+from pdeforge.models.airfoil_euler_2d import AirfoilEuler2D
 from pdeforge.models.kdv_1d import KdV1D
 from pdeforge.models.kolmogorov_flow_2d import KolmogorovFlow2D
 from pdeforge.models.ks_1d import KuramotoSivashinsky1D

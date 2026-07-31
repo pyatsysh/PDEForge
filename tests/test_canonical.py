@@ -540,3 +540,196 @@ class TestKdVBackwardsCompatible:
         x = m.grids["x"]
         d = (x - 0.5 * L + L / 2) % L - L / 2
         assert np.allclose(m.soliton(c), 0.5 * c / np.cosh(0.5 * np.sqrt(c) * d) ** 2)
+
+
+AIRFRANS_ROOT = Path(os.environ.get("PDEFORGE_AIRFRANS_ROOT", "/nonexistent"))
+
+
+def _vtk_xml_doc(arrays, compressed, header_type="UInt32"):
+    """Build a minimal .vtu in memory, the way VTK writes it."""
+    import base64
+    import zlib
+
+    htype = {"UInt32": np.uint32, "UInt64": np.uint64}[header_type]
+
+    def encode(a):
+        raw = a.tobytes()
+        if not compressed:
+            head = np.array([len(raw)], dtype=htype).tobytes()
+            return base64.b64encode(head).decode() + base64.b64encode(raw).decode()
+        # header and payload are two INDEPENDENT base64 streams
+        blob = zlib.compress(raw)
+        head = np.array([1, len(raw), len(raw), len(blob)], dtype=htype).tobytes()
+        return base64.b64encode(head).decode() + base64.b64encode(blob).decode()
+
+    vtk_type = {
+        np.dtype(np.float32): "Float32",
+        np.dtype(np.float64): "Float64",
+        np.dtype(np.int64): "Int64",
+    }
+    n = len(next(iter(arrays.values())))
+    comp = ' compressor="vtkZLibDataCompressor"' if compressed else ""
+    body = []
+    for name, a in arrays.items():
+        nc = a.shape[1] if a.ndim > 1 else 1
+        body.append(
+            f'<DataArray type="{vtk_type[a.dtype]}" Name="{name}" '
+            f'NumberOfComponents="{nc}" format="binary">{encode(a)}</DataArray>'
+        )
+    pts = encode(np.zeros((n, 3), dtype=np.float64))
+    return (
+        f'<?xml version="1.0"?>\n<VTKFile type="UnstructuredGrid" '
+        f'header_type="{header_type}"{comp}><UnstructuredGrid>'
+        f'<Piece NumberOfPoints="{n}" NumberOfCells="0">'
+        f'<Points><DataArray type="Float64" Name="Points" '
+        f'NumberOfComponents="3" format="binary">{pts}</DataArray></Points>'
+        f'<PointData>{"".join(body)}</PointData>'
+        f"</Piece></UnstructuredGrid></VTKFile>"
+    )
+
+
+class TestVTKXMLReader:
+    """
+    The reader exists so AirfRANS interop does not drag vtk/pyvista/meshio
+    into the install. These round-trips need no external data.
+    """
+
+    @pytest.mark.parametrize("compressed", [True, False])
+    @pytest.mark.parametrize("header_type", ["UInt32", "UInt64"])
+    def test_round_trip(self, tmp_path, compressed, header_type):
+        from pdeforge.io.vtk_xml import read_vtk_xml
+
+        rng = np.random.default_rng(0)
+        arrays = {
+            "scalar": rng.standard_normal(97).astype(np.float32),
+            "vector": rng.standard_normal((97, 3)).astype(np.float32),
+            "ids": np.arange(97, dtype=np.int64),
+        }
+        f = tmp_path / "t.vtu"
+        f.write_text(_vtk_xml_doc(arrays, compressed, header_type))
+
+        got = read_vtk_xml(f)
+        assert got["n_points"] == 97
+        assert got["points"].shape == (97, 3)
+        for name, a in arrays.items():
+            assert got[name].shape == a.shape
+            assert np.array_equal(got[name], a)
+
+    def test_appended_data_raises_not_silently_wrong(self, tmp_path):
+        from pdeforge.io.vtk_xml import read_vtk_xml
+
+        f = tmp_path / "a.vtu"
+        f.write_text(
+            '<?xml version="1.0"?><VTKFile type="UnstructuredGrid">'
+            '<UnstructuredGrid><Piece NumberOfPoints="0" NumberOfCells="0">'
+            "</Piece></UnstructuredGrid>"
+            '<AppendedData encoding="raw">_</AppendedData></VTKFile>'
+        )
+        with pytest.raises(NotImplementedError, match="appended"):
+            read_vtk_xml(f)
+
+
+class TestAirfRANSNames:
+    """Name parsing needs no data files."""
+
+    def test_four_and_five_digit_series(self):
+        from pdeforge.io.airfrans import NU_AIR, parse_case_name
+
+        p4 = parse_case_name("airFoil2D_SST_31.283_-4.156_0.919_6.98_14.32")
+        assert p4["turbulence"] == "SST"
+        assert p4["inlet_velocity_m_s"] == 31.283
+        assert p4["angle_of_attack_deg"] == -4.156
+        assert p4["naca_params"] == [0.919, 6.98, 14.32]
+        assert p4["naca_series"] == 4
+        assert np.isclose(p4["reynolds"], 31.283 / NU_AIR)
+
+        p5 = parse_case_name("airFoil2D_SST_31.382_3.588_1.994_6.206_0.0_13.271")
+        assert p5["naca_series"] == 5
+        assert len(p5["naca_params"]) == 4
+
+    def test_rejects_foreign_names(self):
+        from pdeforge.io.airfrans import parse_case_name
+
+        with pytest.raises(ValueError, match="not an AirfRANS case name"):
+            parse_case_name("burgers_1d_seed0")
+
+
+@pytest.mark.skipif(
+    not AIRFRANS_ROOT.exists(),
+    reason="set PDEFORGE_AIRFRANS_ROOT to the AirfRANS Dataset directory",
+)
+class TestAirfRANSInterop:
+    """
+    Shootout-tier tests against the distributed AirfRANS data. These assert
+    PHYSICS, not just shapes: if the pressure normalisation or the freestream
+    convention were wrong, C_p would not peak at 1.
+    """
+
+    def test_loads_split_with_expected_shape(self):
+        from pdeforge import load_airfrans
+
+        d = load_airfrans(
+            AIRFRANS_ROOT, split="full_train", n_samples=3, n_points=8192,
+            seed=0, verbose=False,
+        )
+        assert d.inputs.shape == (3, 8192, 8)
+        assert d.outputs.shape == (3, 8192, 4)
+        assert d.metadata["source"] == "airfrans"
+        assert np.isfinite(d.inputs).all() and np.isfinite(d.outputs).all()
+
+    def test_stagnation_pressure_coefficient_is_one(self):
+        """
+        C_p = (p/rho)/(0.5|U_inf|^2) must reach +1 at the stagnation point and
+        go negative over the suction side. This pins the kinematic-pressure
+        convention AND the freestream vector U_inf(cos a, sin a) at once.
+        """
+        from pdeforge import load_airfrans
+        from pdeforge.io.airfrans import surface_pressure
+
+        d = load_airfrans(
+            AIRFRANS_ROOT, split="full_train", n_samples=5, n_points=8192,
+            seed=0, verbose=False,
+        )
+        for i in range(d.n_samples):
+            cp = surface_pressure(d, i)["cp"]
+            assert 0.95 < cp.max() <= 1.05, f"case {i}: C_p max {cp.max():.3f}"
+            assert cp.min() < -0.5, f"case {i}: no suction peak"
+
+    def test_wall_nodes_kept_and_no_slip(self):
+        """keep_surface must retain every wall node, and RANS wall nodes
+        carry exactly zero velocity."""
+        from pdeforge import load_airfrans
+
+        d = load_airfrans(
+            AIRFRANS_ROOT, split="full_train", n_samples=2, n_points=8192,
+            keep_surface=True, seed=0, verbose=False,
+        )
+        names = d.input_names
+        for i in range(d.n_samples):
+            wall = d.inputs[i, :, names.index("surface")] > 0.5
+            assert wall.sum() > 500  # ~1000 wall nodes per case
+            uv = d.outputs[i, wall][:, :2]
+            assert np.abs(uv).max() == 0.0  # no-slip, exactly
+            # wall nodes sit at zero distance and carry unit normals
+            assert np.abs(d.inputs[i, wall, names.index("sdf")]).max() < 1e-12
+            n = d.inputs[i, wall][:, [names.index("n_x"), names.index("n_y")]]
+            assert np.allclose(np.linalg.norm(n, axis=1), 1.0, atol=1e-5)
+
+    def test_manifest_splits_are_disjoint_and_sized(self):
+        import json
+
+        m = json.loads((AIRFRANS_ROOT / "manifest.json").read_text())
+        assert len(m["full_train"]) == 800 and len(m["full_test"]) == 200
+        assert not set(m["full_train"]) & set(m["full_test"])
+
+    def test_uniform_draw_loses_the_wall(self):
+        """The reason keep_surface defaults to True: the wall is ~0.6% of the
+        cloud, so a uniform draw keeps almost none of it."""
+        from pdeforge import load_airfrans
+
+        d = load_airfrans(
+            AIRFRANS_ROOT, split="full_train", n_samples=1, n_points=8192,
+            keep_surface=False, seed=0, verbose=False,
+        )
+        wall = d.inputs[0, :, d.input_names.index("surface")] > 0.5
+        assert wall.sum() < 200

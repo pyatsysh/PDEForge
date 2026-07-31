@@ -224,7 +224,9 @@ def reproduce(source, verbose=True, n_jobs=1):
 
 
 from pdeforge._version import __version__
+from pdeforge.io.airfrans import load_airfrans
 from pdeforge.io.datasets import export_pdebench, load_dataset, save_dataset
+from pdeforge.io.vtk_xml import read_vtk_xml
 from pdeforge.presets import list_presets
 
 __all__ = [
@@ -233,6 +235,8 @@ __all__ = [
     "load_dataset",
     "save_dataset",
     "export_pdebench",
+    "load_airfrans",
+    "read_vtk_xml",
     "list_presets",
     "list_models",
     "describe_model",
