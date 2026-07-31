@@ -84,11 +84,19 @@ def generate_dataset(
         if ic_generator == "fourier":  # not explicitly overridden
             ic_generator = cfg.get("ic_generator", "fourier")
         ic_params = {**cfg.get("ic_params", {}), **(ic_params or {})}
+        # A preset may pin the domain and a native resolution (some setups are
+        # only themselves on their own box); explicit arguments still win.
+        if domain is None:
+            domain = cfg.get("domain")
+        if resolution is None:
+            resolution = cfg.get("resolution")
+        if outputs == "final" and "outputs" in cfg:
+            outputs = cfg["outputs"]
 
     if model is None or n_samples is None or resolution is None:
         raise TypeError(
             "generate_dataset requires model, n_samples, and resolution "
-            "(or a preset supplying the model)."
+            "(or a preset supplying the model and a native resolution)."
         )
 
     model_cls = get_model(model)

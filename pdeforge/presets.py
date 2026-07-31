@@ -18,6 +18,10 @@ hold a copy (see tests/test_canonical.py):
   coefficients reproduces THEIR stored solutions to 0.49% rel-L2.
 - burgers_{smooth,canonical,rough}_1d: reproduces an independent ETDRK4
   reference implementation to ~3e-8 rel-L2.
+- mp_pde_kdv_1d: our ETDRK4 reproduces THEIR solver (scipy Radau + psdiff)
+  to ~2e-4 rel-L2 at nx = 256, T = 100 — and that residual is theirs, not
+  ours: against a converged nx = 1024 reference we sit at 8e-7 while their
+  Radau sits at 2.9e-4. Short-horizon agreement is ~1e-6.
 Presets are statistical twins of the published setups (same equation,
 parameters, and input measure), not byte-identical replicas — the originals'
 random draws are not recoverable.
@@ -126,6 +130,104 @@ PRESETS = {
         "ic_generator": "fourier",
         "ic_params": {"n_modes": 15, "decay": 1.5, "amplitude": 0.7, "use_cos": False},
         "notes": "Regularity ladder, sharp end: front-dominated solutions.",
+    },
+    # ------------------------------------------------------------------
+    # KdV in the dispersive-shock-wave (undular-bore) regime.
+    # ------------------------------------------------------------------
+    # Same equation and same ETDRK4 solver as every other KdV setup here, but
+    # a small dispersion scale and a depression input measure. A localised
+    # smooth depression does not steepen into a thin front; it dissolves into
+    # a train of high-wavenumber oscillations filling a LARGE contiguous
+    # fraction of the domain. Where a Burgers shock mis-samples only a
+    # sqrt(nu)-thin front, the bore is hard for a band-limited operator
+    # everywhere it lives — a stringent operator / UQ benchmark.
+    "kdv_dsw_1d": {
+        "model": "kdv_1d",
+        "domain": {"x": (0.0, 1.0)},
+        "resolution": {"x": 512},
+        "params": {
+            "advection": 6.0,
+            "dispersion": 8.0e-6,
+            "time_end": 1.0e-2,
+            "_n_time_steps": 101,
+            "_dt": 1.0e-6,
+        },
+        "ic_generator": "depression_box",
+        "notes": "KdV undular bore, vigorous: ~155 oscillations at nx=512, but "
+        "un-resolved there (429 at nx=2048) — a large un-resolvable BIAS set.",
+    },
+    # The same bore at a longer wavelength: a moderate operator can nearly
+    # resolve it, so hardness becomes epistemic (data-limited) rather than a
+    # bias floor — the pairing is what makes the two useful for method
+    # comparison.
+    "kdv_dsw_epistemic_1d": {
+        "model": "kdv_1d",
+        "domain": {"x": (0.0, 1.0)},
+        "resolution": {"x": 512},
+        "params": {
+            "advection": 6.0,
+            "dispersion": 4.0e-5,
+            "time_end": 1.0e-2,
+            "_n_time_steps": 101,
+            "_dt": 1.0e-6,
+        },
+        "ic_generator": "depression_box",
+        "notes": "KdV undular bore, near-resolvable: ~83 oscillations and "
+        "grid-converged at nx=512 — hardness is EPISTEMIC (data-limited), "
+        "not a band-limit bias floor.",
+    },
+    # ------------------------------------------------------------------
+    # Brandstetter et al. — KdV on a long periodic box, the input measure and
+    # protocol shared by "Message Passing Neural PDE Solvers" (arXiv:2202.03376)
+    # and "Lie Point Symmetry Data Augmentation" (arXiv:2202.07643).
+    # ------------------------------------------------------------------
+    # u_t + u u_x + u_xxx = 0 (mu = delta2 = 1, NOT the textbook mu = 6) on
+    # L = 128 with nx = 256, from a 10-wave random sine series restricted to
+    # wavenumbers {1, 2}. Their generator randomises L and T by +/-10% per
+    # trajectory (scale_jitter) and keeps only the last 140 of 250 frames, so
+    # a sample starts at t ~ 0.44 T from a developed soliton gas, not the IC.
+    # Un-dealiased to match their psdiff right-hand side; at nx = 256 the
+    # 2/3 mask would also cut genuine spectral content.
+    "mp_pde_kdv_1d": {
+        "model": "kdv_1d",
+        "domain": {"x": (0.0, 128.0)},
+        "resolution": {"x": 256},
+        "params": {
+            "advection": 1.0,
+            "dispersion": 1.0,
+            "time_end": 100.0,
+            "dealias": False,
+            "scale_jitter": 0.1,
+            "_n_time_steps": 250,
+            "_n_frames_kept": 140,
+            "_dt": 5e-3,
+        },
+        "ic_generator": "sine_series",
+        "ic_params": {"n_waves": 10, "lmin": 1, "lmax": 3, "amplitude": 0.5},
+        "outputs": "trajectory",
+        "notes": "Brandstetter et al. KdV (MP-PDE / LPSDA). ETDRK4 sits 8e-7 "
+        "from a converged nx=1024 reference at T=100, where their own Radau "
+        "sits at 2.9e-4; dt = 5e-3 is converged.",
+    },
+    # Their "easy" variant: same measure, half the horizon.
+    "mp_pde_kdv_easy_1d": {
+        "model": "kdv_1d",
+        "domain": {"x": (0.0, 128.0)},
+        "resolution": {"x": 256},
+        "params": {
+            "advection": 1.0,
+            "dispersion": 1.0,
+            "time_end": 50.0,
+            "dealias": False,
+            "scale_jitter": 0.1,
+            "_n_time_steps": 250,
+            "_n_frames_kept": 140,
+            "_dt": 5e-3,
+        },
+        "ic_generator": "sine_series",
+        "ic_params": {"n_waves": 10, "lmin": 1, "lmax": 3, "amplitude": 0.5},
+        "outputs": "trajectory",
+        "notes": "Brandstetter et al. KdV, 'easy' end_time = 50 variant.",
     },
     # ------------------------------------------------------------------
     # PDEBench-flavoured low-viscosity Burgers.

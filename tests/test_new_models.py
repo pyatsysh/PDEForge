@@ -120,6 +120,105 @@ class TestKdV1D:
         assert np.isclose(np.mean(u), np.mean(ic), atol=1e-10)
 
 
+class TestKdVDispersiveShockRegime:
+    """
+    The undular-bore regime. It is a PRESET over kdv_1d, not a model of its
+    own: same ETDRK4 spec, small dispersion, depression input measure.
+    """
+
+    @staticmethod
+    def _model(resolution=None, **overrides):
+        from pdeforge.presets import get_preset
+
+        cfg = get_preset("kdv_dsw_1d")
+        return get_model(cfg["model"])(
+            resolution=resolution or cfg["resolution"],
+            domain=cfg["domain"],
+            **{**cfg["params"], **overrides},
+        )
+
+    def test_soliton_propagation(self):
+        """
+        Exact solution: u = (12 delta2 k^2 / mu) sech^2(k(x - x0 - c t)) with
+        c = 4 delta2 k^2 must translate rigidly. This pins linear_symbol (delta2)
+        and nonlinear_hat (mu) at once, at a resolvable dispersion scale.
+        """
+        L, mu, delta2 = 1.0, 6.0, 2.0e-4
+        k = 2.0 * np.pi * 8.0
+        A, c = 12.0 * delta2 * k**2 / mu, 4.0 * delta2 * k**2
+        m = self._model(
+            resolution={"x": 1024},
+            time_end=0.02,
+            dispersion=delta2,
+            advection=mu,
+            _dt=2e-6,
+        )
+        x = m.grids["x"]
+
+        def soliton(x0):
+            d = (x - x0 + L / 2) % L - L / 2
+            return A / np.cosh(k * d) ** 2
+
+        u = m.solve(soliton(0.35 * L))
+        expected = soliton(0.35 * L + c * 0.02)
+        rel = np.linalg.norm(u - expected) / np.linalg.norm(expected)
+        assert rel < 1e-3
+
+    def test_depression_box_seeds_bore(self):
+        """
+        The preset's IC is reproducible and dissolves into a dispersive shock:
+        a LARGE (not sqrt(nu)-thin) contiguous oscillatory region.
+        """
+        m = self._model()
+        ic_a = m.generate_ic(generator="depression_box", seed=0)
+        ic_b = m.generate_ic(generator="depression_box", seed=0)
+        assert np.array_equal(ic_a, ic_b)  # reproducible for fixed seed
+        assert ic_a.min() < -2.0  # a genuine depression is present
+
+        u = m.solve(ic_a)
+        assert np.isfinite(u).all()
+        grad = np.abs(np.diff(u, append=u[:1]))
+        osc_frac = (grad > grad.mean()).mean()
+        assert osc_frac > 0.15  # the bore fills a large area fraction
+
+    def test_mass_conserved(self):
+        m = self._model(resolution={"x": 256}, time_end=5e-3, _dt=1e-6)
+        ic = m.generate_ic(generator="depression_box", seed=3)
+        u = m.solve(ic)
+        assert np.isclose(np.mean(u), np.mean(ic), atol=1e-9)
+
+    def test_both_bore_presets_and_their_regimes(self):
+        """
+        The pairing is the point: 8e-6 is a bias set whose k-content exceeds a
+        modest band limit, 4e-5 is near-resolvable. The bore must therefore be
+        measurably coarser (lower mean wavenumber) in the epistemic preset.
+        """
+        from pdeforge.presets import get_preset
+
+        assert get_preset("kdv_dsw_1d")["params"]["dispersion"] == 8.0e-6
+        assert get_preset("kdv_dsw_epistemic_1d")["params"]["dispersion"] == 4.0e-5
+        for name in ("kdv_dsw_1d", "kdv_dsw_epistemic_1d"):
+            cfg = get_preset(name)
+            assert cfg["model"] == "kdv_1d"
+            assert cfg["ic_generator"] == "depression_box"
+
+        from scipy.signal import find_peaks
+
+        def n_oscillations(dispersion):
+            """
+            Count bore oscillations directly. NOT the spectral centroid: at
+            nx = 512 the 2/3 mask has already truncated the 8e-6 bore, so its
+            centroid reads LOW (3.8 vs 10.3) even though its true wavelength
+            is the shorter one. That truncation is the bias set's whole point.
+            """
+            m = self._model(dispersion=dispersion)
+            u = m.solve(m.generate_ic(generator="depression_box", seed=0))
+            return len(find_peaks(u, prominence=0.05)[0])
+
+        # measured: ~155 oscillations at 8e-6 vs ~83 at 4e-5
+        assert n_oscillations(8.0e-6) > 1.5 * n_oscillations(4.0e-5)
+
+
 class TestKolmogorov2D:
     def test_energy_bounded_and_sustained(self):
         m = get_model("kolmogorov_flow_2d")(

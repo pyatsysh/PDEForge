@@ -207,6 +207,165 @@ class FourierICGenerator(ICGenerator):
         return u
 
 
+class TruncatedSineGenerator(ICGenerator):
+    """
+    Truncated random sine series on a periodic interval:
+
+        u0(x) = sum_{j=1}^{N} A_j sin(2 pi l_j x / L + phi_j)
+
+    with A_j ~ U(-amplitude, amplitude), phi_j ~ U(0, 2 pi), and INTEGER
+    wavenumbers l_j drawn uniformly from the HALF-OPEN range [lmin, lmax).
+
+    This is the input measure behind the Brandstetter et al. KdV / KS /
+    Burgers benchmark datasets (arXiv:2202.03376, arXiv:2202.07643). The
+    half-open convention is theirs (np.random.randint) and is load-bearing:
+    the canonical (lmin, lmax) = (1, 3) excites modes 1 and 2 ONLY, never 3.
+    Closing the interval would silently widen the measure.
+
+    Wavenumbers are drawn with replacement, so N = 10 draws over two
+    admissible modes is a long-wave two-mode field whose per-mode amplitude
+    and phase are the sum of several random draws — not a uniform prior on
+    two coefficients. It is exactly zero-mean on a uniform periodic grid
+    (every l_j >= 1 is a whole number of periods), which matters for KdV:
+    mass is conserved, so the mean never drifts back in.
+
+    Parameters
+    ----------
+    n_waves : int
+        Number of superposed sine waves (N).
+    lmin, lmax : int
+        Integer wavenumber range, half-open: l ~ randint(lmin, lmax).
+    amplitude : float
+        Half-width of the uniform amplitude prior.
+    """
+
+    def __init__(
+        self,
+        n_waves: int = 10,
+        lmin: int = 1,
+        lmax: int = 3,
+        amplitude: float = 0.5,
+    ):
+        if lmax <= lmin:
+            raise ValueError(
+                f"lmax must exceed lmin (half-open range), got {lmin!r}, {lmax!r}"
+            )
+        self.n_waves = n_waves
+        self.lmin = lmin
+        self.lmax = lmax
+        self.amplitude = amplitude
+
+    def generate(
+        self,
+        shape: Tuple[int, ...],
+        seed: Optional[int] = None,
+        grid: Optional[Dict[str, np.ndarray]] = None,
+    ) -> np.ndarray:
+        if len(shape) != 1:
+            raise ValueError(
+                "TruncatedSineGenerator is 1D (got shape %r)" % (shape,)
+            )
+        rng = np.random.default_rng(seed)
+        n = shape[0]
+
+        if grid is None:
+            x = np.linspace(0, 1, n, endpoint=False)
+            L = 1.0
+        else:
+            x = grid.get("x", np.linspace(0, 1, n, endpoint=False))
+            L = x[-1] - x[0] + (x[1] - x[0])  # periodic spacing
+
+        A = rng.uniform(-self.amplitude, self.amplitude, self.n_waves)
+        phi = rng.uniform(0.0, 2.0 * np.pi, self.n_waves)
+        l = rng.integers(self.lmin, self.lmax, self.n_waves)
+
+        # (n, N) -> weighted sum over the wave axis
+        return (A * np.sin(2.0 * np.pi * l * x[:, None] / L + phi)).sum(axis=-1)
+
+
+def _smootherstep(x):
+    """Quintic smoothstep on [0, 1] (C^2, zero first/second derivatives at 0,1)."""
+    x = np.clip(x, 0.0, 1.0)
+    return x**3 * (x * (x * 6.0 - 15.0) + 10.0)
+
+
+class DepressionBoxGenerator(ICGenerator):
+    """
+    A gentle smooth background plus a strong, sharp-edged negative box
+    localised in one half of a periodic interval — the input measure that
+    reliably seeds a dispersive shock wave (undular bore) under KdV.
+
+    A localised depression does not steepen into a thin front the way a
+    Burgers shock does; it dissolves into a train of high-wavenumber
+    oscillations filling a LARGE, contiguous fraction of the domain. Where a
+    Burgers shock mis-samples only a sqrt(nu)-thin front, the bore is hard for
+    a band-limited operator everywhere it lives, which is what makes it a
+    stringent operator / UQ benchmark. The box sits at a fixed side so the
+    bore lands in a consistently located region across samples.
+
+    Parameters
+    ----------
+    side : {"right", "left"}
+        Which half hosts the depression.
+    amp_range : (float, float)
+        Depression depth, drawn uniformly.
+    width_frac : float
+        Nominal box width as a fraction of L.
+    background : float
+        Amplitude scale of the smooth two-mode background.
+    """
+
+    def __init__(
+        self,
+        side: str = "right",
+        amp_range: Tuple[float, float] = (3.0, 3.6),
+        width_frac: float = 0.32,
+        background: float = 0.12,
+    ):
+        if side not in ("right", "left"):
+            raise ValueError(f"side must be 'right' or 'left', got {side!r}")
+        self.side = side
+        self.amp_range = amp_range
+        self.width_frac = width_frac
+        self.background = background
+
+    def generate(
+        self,
+        shape: Tuple[int, ...],
+        seed: Optional[int] = None,
+        grid: Optional[Dict[str, np.ndarray]] = None,
+    ) -> np.ndarray:
+        if len(shape) != 1:
+            raise ValueError(
+                "DepressionBoxGenerator is 1D (got shape %r)" % (shape,)
+            )
+        rng = np.random.default_rng(seed)
+        n = shape[0]
+
+        if grid is None:
+            x = np.linspace(0, 1, n, endpoint=False)
+            L = 1.0
+        else:
+            x = grid.get("x", np.linspace(0, 1, n, endpoint=False))
+            L = x[-1] - x[0] + (x[1] - x[0])  # periodic spacing
+
+        # Gentle smooth background (varies per sample) -> both halves non-trivial.
+        bg = np.zeros_like(x)
+        for m in (1, 2):
+            phase = rng.uniform(0.0, 2.0 * np.pi)
+            bg += rng.normal(0.0, self.background) / m * np.sin(
+                2.0 * np.pi * m * x / L + phase
+            )
+
+        # Strong, sharp-edged depression box -> a vigorous high-k bore.
+        a = 0.58 * L if self.side == "right" else 0.12 * L
+        w = self.width_frac * L * rng.uniform(0.9, 1.05)
+        amp = rng.uniform(*self.amp_range)
+        edge = 0.008 * L
+        box = _smootherstep((x - a) / edge) * _smootherstep((a + w - x) / edge)
+        return (bg - amp * box).astype(float)
+
+
 class GaussianRandomFieldGenerator(ICGenerator):
     """
     Generate initial conditions using Gaussian Random Fields.
@@ -370,7 +529,8 @@ def get_ic_generator(name: str, **params) -> ICGenerator:
     Parameters
     ----------
     name : str
-        Generator type: "fourier", "grf", "sigmoid"
+        Generator type: "fourier", "sine_series", "depression_box", "grf",
+        "sigmoid"
     **params
         Parameters for the generator
 
@@ -381,6 +541,9 @@ def get_ic_generator(name: str, **params) -> ICGenerator:
     """
     generators = {
         "fourier": FourierICGenerator,
+        "sine_series": TruncatedSineGenerator,
+        "truncated_sine": TruncatedSineGenerator,
+        "depression_box": DepressionBoxGenerator,
         "grf": GaussianRandomFieldGenerator,
         "gaussian_random_field": GaussianRandomFieldGenerator,
         "grf_neumann": GRFNeumannGenerator,

@@ -308,3 +308,235 @@ class TestDarcyFNO3D:
         assert d.outputs.shape == (2, 17, 17, 17)
         # boundary exactly zero (Dirichlet)
         assert np.abs(d.outputs[:, 0]).max() == 0.0
+
+
+class TestMPPDEKdV:
+    """
+    Brandstetter et al. KdV — the generator shared by "Message Passing Neural
+    PDE Solvers" (arXiv:2202.03376) and "Lie Point Symmetry Data Augmentation"
+    (arXiv:2202.07643): u_t + u u_x + u_xxx = 0 on a periodic L = 128 box,
+    nx = 256, from a 10-wave random sine series over wavenumbers {1, 2}.
+    """
+
+    @staticmethod
+    def _reference(u0, L, T, nt, tol=1e-9):
+        """Their own scheme, verbatim: psdiff derivatives stepped by Radau."""
+        from scipy.fftpack import diff as psdiff
+        from scipy.integrate import solve_ivp
+
+        def rhs(t, u, L):
+            return -u * psdiff(u, period=L) - psdiff(u, order=3, period=L)
+
+        sol = solve_ivp(
+            rhs,
+            [0.0, T],
+            u0,
+            method="Radau",
+            t_eval=np.linspace(0.0, T, nt),
+            args=(L,),
+            atol=tol,
+            rtol=tol,
+        )
+        assert sol.success, sol.message
+        return sol.y.T
+
+    def test_reproduces_their_reference_solver(self):
+        """
+        The decisive check: OUR ETDRK4 against THEIR Radau + psdiff scheme on
+        the same initial field. Un-dealiased, because their right-hand side is
+        — with the 2/3 mask on, the two schemes genuinely differ (the mask
+        also cuts real spectral content at nx = 256).
+        """
+        L, nx, T, nt = 128.0, 128, 5.0, 6
+        m = get_model("kdv_1d")(
+            resolution={"x": nx},
+            domain={"x": (0.0, L)},
+            advection=1.0,
+            dispersion=1.0,
+            dealias=False,
+            time_end=T,
+            _n_time_steps=nt,
+            _dt=2e-3,
+        )
+        for seed in (0, 1, 2):
+            u0 = m.generate_ic(generator="sine_series", seed=seed)
+            got = m.solve(u0, return_full=True)
+            ref = self._reference(u0, L, T, nt)
+            rel = np.linalg.norm(got - ref) / np.linalg.norm(ref)
+            assert rel < 1e-5, f"seed {seed}: rel-L2 {rel:.3e}"
+
+    def test_dealias_mask_matters_once_the_spectrum_broadens(self):
+        """
+        The mask is not cosmetic here. Early on (narrow spectrum) it changes
+        nothing, but once KdV has broadened the spectrum past nx/3 the 2/3 cut
+        removes GENUINE content and the two runs separate — which is why the
+        preset turns it off rather than treating it as a free choice.
+        Measured against an nx = 1024 reference at T = 100: un-dealiased sits
+        ~8e-7 from the converged solution, dealiased ~1e-4.
+        """
+        kw = dict(
+            resolution={"x": 256},
+            domain={"x": (0.0, 128.0)},
+            advection=1.0,
+            dispersion=1.0,
+            _n_time_steps=2,
+            _dt=5e-3,
+        )
+        u0 = get_model("kdv_1d")(**kw, time_end=20.0, dealias=False).generate_ic(
+            generator="sine_series", seed=0
+        )
+
+        def run(T, mask):
+            return get_model("kdv_1d")(
+                **{**kw, "time_end": T}, dealias=mask
+            ).solve(u0)
+
+        def rel(a, b):
+            return np.linalg.norm(a - b) / np.linalg.norm(b)
+
+        assert rel(run(0.5, True), run(0.5, False)) < 1e-9  # narrow spectrum
+        assert rel(run(20.0, True), run(20.0, False)) > 1e-5  # broadened
+
+    def test_soliton_speed_at_unit_advection(self):
+        """
+        mu and delta2 must both be wired: u = 3c sech^2(sqrt(c)(x-x0-ct)/2)
+        is the exact soliton of u_t + u u_x + u_xxx = 0 and must translate
+        rigidly at speed c.
+        """
+        L, nx, T, c = 128.0, 512, 2.0, 1.0
+        m = get_model("kdv_1d")(
+            resolution={"x": nx},
+            domain={"x": (0.0, L)},
+            advection=1.0,
+            dispersion=1.0,
+            time_end=T,
+            _dt=1e-4,
+        )
+        u = m.solve(m.soliton(c, x0=0.3 * L))
+        expected = m.soliton(c, x0=0.3 * L + c * T)
+        assert np.linalg.norm(u - expected) / np.linalg.norm(expected) < 1e-4
+
+    def test_sine_series_measure(self):
+        """Zero-mean, and ONLY wavenumbers 1 and 2 carry power — the
+        half-open randint(lmin, lmax) convention, not a closed range."""
+        from pdeforge.generators.initial_conditions import TruncatedSineGenerator
+
+        gen = TruncatedSineGenerator(n_waves=10, lmin=1, lmax=3, amplitude=0.5)
+        nx, L = 256, 128.0
+        grid = {"x": np.linspace(0.0, (1 - 1.0 / nx) * L, nx)}
+        power = np.zeros(nx // 2)
+        for seed in range(40):
+            u0 = gen.generate(shape=(nx,), seed=seed, grid=grid)
+            assert abs(u0.mean()) < 1e-12  # exactly zero-mean on the grid
+            power += np.abs(np.fft.rfft(u0)[: nx // 2]) ** 2
+        assert power[1] > 0 and power[2] > 0
+        # every other mode, mode 3 included, is empty to machine precision
+        assert power[3] / power[1:3].max() < 1e-24
+        assert power[[0, *range(3, nx // 2)]].max() / power[1:3].max() < 1e-24
+
+    def test_scale_jitter_leaves_this_measure_invariant(self):
+        """
+        The sine series is a function of x/L, so a jittered box must not
+        change the IC array — only the dynamics. That separation is the point:
+        jitter enriches the trajectories without disturbing the input measure.
+        """
+        kw = dict(
+            resolution={"x": 128},
+            domain={"x": (0.0, 128.0)},
+            advection=1.0,
+            dispersion=1.0,
+            time_end=5.0,
+            dealias=False,
+            _dt=2e-3,
+        )
+        plain = get_model("kdv_1d")(**kw, scale_jitter=0.0)
+        jittered = get_model("kdv_1d")(**kw, scale_jitter=0.1)
+
+        ic_a = plain.generate_ic(generator="sine_series", seed=7)
+        ic_b = jittered.generate_ic(generator="sine_series", seed=7)
+        assert np.allclose(ic_a, ic_b, atol=1e-14)
+
+        # ...but the solve sees a different box, so the trajectories differ
+        sol_b = jittered.solve(ic_b)
+        assert not np.allclose(plain.solve(ic_a), sol_b, atol=1e-6)
+
+    def test_jitter_restores_nominal_state(self):
+        """A consumed draw must not leak into the next solve or the grid."""
+        m = get_model("kdv_1d")(
+            resolution={"x": 64},
+            domain={"x": (0.0, 128.0)},
+            advection=1.0,
+            dispersion=1.0,
+            time_end=2.0,
+            scale_jitter=0.1,
+            _dt=2e-3,
+        )
+        k0, T0 = m.k.copy(), m.T
+        ic = m.generate_ic(generator="sine_series", seed=1)
+        assert m._sample_scale is not None
+        m.solve(ic)
+        assert m._sample_scale is None
+        assert np.array_equal(m.k, k0) and m.T == T0
+        # a bare solve (no pending draw) is deterministic
+        assert np.array_equal(m.solve(ic), m.solve(ic))
+
+    def test_preset_shape_burn_in_and_grid(self):
+        """140 frames kept out of 250 => trajectories start at ~0.44 T."""
+        d = generate_dataset(
+            preset="mp_pde_kdv_easy_1d",
+            n_samples=2,
+            seed=0,
+            verbose=False,
+            params={"_n_time_steps": 25, "_n_frames_kept": 14, "_dt": 0.02},
+        )
+        assert d.inputs.shape == (2, 256)
+        assert d.outputs.shape == (2, 14, 256)
+        assert np.isfinite(d.outputs).all()
+        t = d.grid["t"]
+        assert len(t) == 14 and np.isclose(t[-1], 50.0)
+        assert np.isclose(t[0], 50.0 * 11 / 24)  # last 14 of 25 frames
+        assert np.isclose(d.grid["x"][1] - d.grid["x"][0], 0.5)  # L/nx = 128/256
+
+    def test_preset_registered_and_pins_the_regime(self):
+        from pdeforge.presets import get_preset
+
+        for name in ("mp_pde_kdv_1d", "mp_pde_kdv_easy_1d"):
+            cfg = get_preset(name)
+            assert cfg["model"] == "kdv_1d"
+            assert cfg["params"]["advection"] == 1.0
+            assert cfg["params"]["dispersion"] == 1.0
+            assert cfg["params"]["dealias"] is False
+            assert cfg["params"]["scale_jitter"] == 0.1
+            assert cfg["domain"] == {"x": (0.0, 128.0)}
+            assert cfg["resolution"] == {"x": 256}
+            assert cfg["outputs"] == "trajectory"
+            assert cfg["ic_params"]["lmax"] == 3
+
+    def test_mass_conserved_over_the_horizon(self):
+        """KdV conserves mass; the measure is zero-mean, so it must stay so."""
+        m = get_model("kdv_1d")(
+            resolution={"x": 128},
+            domain={"x": (0.0, 128.0)},
+            advection=1.0,
+            dispersion=1.0,
+            dealias=False,
+            time_end=20.0,
+            _dt=5e-3,
+        )
+        ic = m.generate_ic(generator="sine_series", seed=4)
+        assert abs(m.solve(ic).mean() - ic.mean()) < 1e-11
+
+
+class TestKdVBackwardsCompatible:
+    def test_textbook_defaults_unchanged(self):
+        """kdv_1d's new coefficient knobs must default to the old hardcoded
+        mu = 6, delta2 = 1 behaviour, mask and all."""
+        m = get_model("kdv_1d")(resolution={"x": 256})
+        assert m.mu == 6.0 and m.delta2 == 1.0
+        assert m.dealias.min() == 0.0  # 2/3 mask still on by default
+        assert m.scale_jitter == 0.0 and m.n_kept == m.n_t
+        # textbook soliton: u = c/2 sech^2(sqrt(c)(x-x0)/2)
+        c, L = 4.0, m.domain.size("x")
+        x = m.grids["x"]
+        d = (x - 0.5 * L + L / 2) % L - L / 2
+        assert np.allclose(m.soliton(c), 0.5 * c / np.cosh(0.5 * np.sqrt(c) * d) ** 2)

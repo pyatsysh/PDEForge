@@ -593,7 +593,7 @@ print(describe_model("burgers_1d"))
 | `wave_2d` | Hyperbolic (oscillatory) | 2D | Spectral |
 | `heterogeneous_wave_2d` | Wave in random media (c(x) → field) | 2D | Spectral |
 | `ks_1d` | Kuramoto-Sivashinsky (chaotic) | 1D | Spectral (+JAX) |
-| `kdv_1d` | Dispersive solitons | 1D | Spectral (+JAX) |
+| `kdv_1d` | Dispersive solitons; bore + benchmark regimes as presets | 1D | Spectral (+JAX) |
 | `ns_vorticity_2d` | Incompressible Navier-Stokes | 2D | Spectral (+JAX) |
 | `kolmogorov_flow_2d` | Forced 2D turbulence | 2D | Spectral (+JAX) |
 | `shallow_water_2d` | Gravity waves (h, hu, hv) | 2D | Spectral (+JAX) |
