@@ -63,8 +63,8 @@ One per hue of the nord admonition palette.
     to the call.
 
 !!! success "A success"
-    The Darcy generator reproduces the distributed FNO data to 0.49%
-    relative L2.
+    The Darcy generator reproduces the distributed FNO data bit for bit,
+    to within 2 ulp of float32.
 
 !!! question "A question"
     Which resolution does a model support? Any: resolution is a

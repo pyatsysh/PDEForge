@@ -13,9 +13,12 @@ knob (params= / ic_params= overrides win over the preset).
 
 Fidelity statements are backed by tests against distributed data where we
 hold a copy (see tests/test_canonical.py):
-- fno_darcy_2d: input measure recovered from the distributed Darcy421 data
-  (spectrum fit alpha = 2.00, tau = 3.04, R^2 = 0.998); solving THEIR stored
-  coefficients reproduces THEIR stored solutions to 0.49% rel-L2.
+- fno_darcy_2d: BIT-EXACT. Solving THEIR stored Darcy421 coefficients with
+  our model returns THEIR stored solutions with 99.1% of the 177,241 float32
+  values identical and no value off by more than 2 ulp — the residue is
+  MATLAB's sparse LU against SciPy's, nothing more. The input measure is the
+  canonical one exactly (tau^(alpha-1) normalisation, sigma = 0.292083 at
+  alpha = 2, tau = 3), not a fit.
 - burgers_{smooth,canonical,rough}_1d: reproduces an independent ETDRK4
   reference implementation to ~3e-8 rel-L2.
 - mp_pde_kdv_1d: our ETDRK4 reproduces THEIR solver (scipy Radau + psdiff)
@@ -32,17 +35,31 @@ PRESETS = {
     # Li et al. 2020 (FNO) — Darcy flow, unit square, Dirichlet, f = 1.
     # ------------------------------------------------------------------
     # The Darcy421 family: log-normal coefficients a = exp(psi),
-    # psi ~ N(0, (-Lap + 9)^(-2))  [alpha=2, tau=3; sigma measured 0.2918].
+    # psi ~ N(0, 9(-Lap + 9)^(-2))  [alpha=2, tau=3 => sigma = 0.292083].
     "fno_darcy_2d": {
         "model": "darcy_fno_2d",
         "params": {
             "coeff": "lognormal",
+            "grid": "canonical",
             "alpha": 2.0,
             "tau": 3.0,
-            "sigma": 0.2918,
             "forcing": 1.0,
         },
-        "notes": "Canonical Darcy421 (log-normal). Validated vs distributed data.",
+        "notes": "Canonical Darcy421 (log-normal). Bit-exact vs distributed data.",
+    },
+    # The same physics without the original's two spline grid transfers:
+    # a straight node-grid solve, exactly zero on the boundary. Prefer this
+    # for new data; use fno_darcy_2d to match the published arrays.
+    "fno_darcy_clean_2d": {
+        "model": "darcy_fno_2d",
+        "params": {
+            "coeff": "lognormal",
+            "grid": "node",
+            "alpha": 2.0,
+            "tau": 3.0,
+            "forcing": 1.0,
+        },
+        "notes": "Darcy421 measure, clean node-grid solve (no resampling).",
     },
     # The piececonst family: two-phase {12, 3} thresholded pushforward.
     "fno_darcy_piececonst_2d": {

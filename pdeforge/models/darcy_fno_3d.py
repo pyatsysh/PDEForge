@@ -66,10 +66,10 @@ class DarcyFNO3D(PDEModel):
         ),
         ParamSpec(
             name="sigma",
-            description="GRF pointwise std (lognormal contrast)",
-            default=0.2918,
+            description="GRF pointwise std (None = canonical tau^(alpha-1))",
+            default=None,
             param_type=ParamType.INPUT,
-            bounds=(0.01, 2.0),
+            affects="exp(+-sigma) sets the permeability contrast",
         ),
         ParamSpec(
             name="kappa_plus",
@@ -98,7 +98,7 @@ class DarcyFNO3D(PDEModel):
         "coeff": "lognormal",
         "alpha": 2.0,
         "tau": 3.0,
-        "sigma": 0.2918,
+        "sigma": None,
         "kappa_plus": 12.0,
         "kappa_minus": 3.0,
         "threshold": 0.0,
@@ -148,7 +148,7 @@ class DarcyFNO3D(PDEModel):
         if self.coeff == "lognormal":
             return np.exp(psi)
         if self.coeff == "piececonst":
-            thr = self.params.get("threshold", 0.0) * self.sigma_grf
+            thr = self.params.get("threshold", 0.0) * gen.expected_std(self.field_shape)
             return np.where(
                 psi >= thr, self.params["kappa_plus"], self.params["kappa_minus"]
             ).astype(float)

@@ -262,9 +262,7 @@ class TruncatedSineGenerator(ICGenerator):
         grid: Optional[Dict[str, np.ndarray]] = None,
     ) -> np.ndarray:
         if len(shape) != 1:
-            raise ValueError(
-                "TruncatedSineGenerator is 1D (got shape %r)" % (shape,)
-            )
+            raise ValueError("TruncatedSineGenerator is 1D (got shape %r)" % (shape,))
         rng = np.random.default_rng(seed)
         n = shape[0]
 
@@ -336,9 +334,7 @@ class DepressionBoxGenerator(ICGenerator):
         grid: Optional[Dict[str, np.ndarray]] = None,
     ) -> np.ndarray:
         if len(shape) != 1:
-            raise ValueError(
-                "DepressionBoxGenerator is 1D (got shape %r)" % (shape,)
-            )
+            raise ValueError("DepressionBoxGenerator is 1D (got shape %r)" % (shape,))
         rng = np.random.default_rng(seed)
         n = shape[0]
 
@@ -353,8 +349,10 @@ class DepressionBoxGenerator(ICGenerator):
         bg = np.zeros_like(x)
         for m in (1, 2):
             phase = rng.uniform(0.0, 2.0 * np.pi)
-            bg += rng.normal(0.0, self.background) / m * np.sin(
-                2.0 * np.pi * m * x / L + phase
+            bg += (
+                rng.normal(0.0, self.background)
+                / m
+                * np.sin(2.0 * np.pi * m * x / L + phase)
             )
 
         # Strong, sharp-edged depression box -> a vigorous high-k bore.
@@ -568,15 +566,41 @@ class GRFNeumannGenerator(ICGenerator):
     distributed Darcy421 data, spectrum fit R^2 = 0.998).
 
     Sampled by Karhunen-Loeve expansion in the cosine (DCT) basis with
-    per-mode variance (pi^2 (i^2 + j^2) + tau^2)^(-alpha), then rescaled to
-    an exact target pointwise std `sigma` (the overall scale is the one
-    convention-dependent constant; pinning it to data is the honest choice).
+    per-mode variance (pi^2 (i^2 + j^2) + tau^2)^(-alpha).
+
+    The overall scale is fixed by the canonical generator's own convention,
+    C = tau^(2 alpha - 2) (-Laplacian + tau^2 I)^(-alpha), giving
+
+        E[ mean of psi^2 ] = tau^(2 alpha - 2) * sum_k lambda_k
+
+    with no free constant: at alpha = 2, tau = 3 this is sigma = 0.292083,
+    which is where the 0.2918 measured from the distributed Darcy421 data
+    comes from. Pass a number for `sigma` to override that scale (rescaling
+    to an exact target pointwise std) when the contrast is the knob you want.
     """
 
-    def __init__(self, alpha: float = 2.0, tau: float = 3.0, sigma: float = 0.2918):
+    def __init__(
+        self,
+        alpha: float = 2.0,
+        tau: float = 3.0,
+        sigma: Optional[float] = None,
+    ):
         self.alpha = alpha
         self.tau = tau
         self.sigma = sigma
+
+    def expected_std(self, shape: Tuple[int, ...]) -> float:
+        """Pointwise std sqrt(E[psi(x)^2]) of the discretised field."""
+        if self.sigma is not None:
+            return float(self.sigma)
+        mode2 = np.zeros(shape)
+        for axis, n in enumerate(shape):
+            idx_shape = [1] * len(shape)
+            idx_shape[axis] = n
+            mode2 = mode2 + (np.arange(n) ** 2).reshape(idx_shape)
+        lam = (np.pi**2 * mode2 + self.tau**2) ** (-self.alpha)
+        lam[(0,) * len(shape)] = 0.0
+        return float(np.sqrt(self.tau ** (2 * self.alpha - 2) * lam.sum()))
 
     def generate(
         self,
@@ -601,12 +625,16 @@ class GRFNeumannGenerator(ICGenerator):
             mode2 = mode2 + (np.arange(n) ** 2).reshape(idx_shape)
         lam = (np.pi**2 * mode2 + self.tau**2) ** (-self.alpha)
         lam[(0,) * len(shape)] = 0.0  # zero-mean field
-        # Fixed-constant calibration: E[domain mean-square] = sigma^2 (via
-        # Parseval for the ortho DCT). Per-sample std then FLUCTUATES around
-        # sigma, as the true Gaussian measure demands (verified against the
-        # canonical Darcy421 data: per-sample std spread ~0.08 around 0.29) —
-        # a per-sample rescale would silently condition the measure.
-        scale = self.sigma / np.sqrt(lam.sum() / np.prod(shape))
+        # Fixed-constant calibration: E[domain mean-square] is set once, so
+        # the per-sample std FLUCTUATES around it, as the true Gaussian
+        # measure demands (the distributed Darcy421 coefficients show a
+        # per-sample spread of ~0.086 around 0.279) — a per-sample rescale
+        # would silently condition the measure.
+        n = np.prod(shape)
+        if self.sigma is None:  # canonical: tau^(alpha-1), no free constant
+            scale = np.sqrt(n) * self.tau ** (self.alpha - 1)
+        else:  # rescale to an exact target pointwise std (Parseval)
+            scale = self.sigma / np.sqrt(lam.sum() / n)
         coeff = rng.standard_normal(shape) * (scale * np.sqrt(lam))
         return idctn(coeff, norm="ortho")
 

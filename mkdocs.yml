@@ -81,6 +81,7 @@ nav:
       - Calibration Protocol: guide/calibration.md
   - Models:
       - Burgers 1D: models/burgers_1d.md
+      - Canonical FNO Darcy: models/darcy_fno_2d.md
       - Darcy 2D: models/darcy_2d.md
       - Stokes 2D: models/stokes_2d.md
       - Cylinder Flow 2D: models/cylinder_flow_2d.md

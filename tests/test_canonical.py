@@ -19,12 +19,13 @@ from pdeforge import generate_dataset, get_model
 # Locally held copies of distributed reference data (not shipped with the
 # repo): point these env vars at the files to enable the shootout tests.
 DARCY421 = Path(os.environ.get("PDEFORGE_DARCY421_NPZ", "/nonexistent"))
+DARCY421_PT = Path(os.environ.get("PDEFORGE_DARCY421_PT", "/nonexistent"))
 BURGERS_REF = Path(os.environ.get("PDEFORGE_BURGERS_REF_NPZ", "/nonexistent"))
 
 
 class TestDarcyFNOSolver:
     def test_operator_residual_machine_precision(self):
-        m = get_model("darcy_fno_2d")(resolution={"x": 65, "y": 65})
+        m = get_model("darcy_fno_2d")(resolution={"x": 65, "y": 65}, grid="node")
         a = m.generate_ic(seed=0)
         u = m.solve(a)
         res = m.apply_operator(a, u)
@@ -34,7 +35,7 @@ class TestDarcyFNOSolver:
         """a = 1: -Lap u = 1 on the unit square has a classical series
         solution; the FD solve must match it to O(h^2)."""
         n = 85
-        u = get_model("darcy_fno_2d")(resolution={"x": n, "y": n}).solve(
+        u = get_model("darcy_fno_2d")(resolution={"x": n, "y": n}, grid="node").solve(
             np.ones((n, n))
         )
         x = np.linspace(0, 1, n)
@@ -51,10 +52,40 @@ class TestDarcyFNOSolver:
         assert np.linalg.norm(u - S) / np.linalg.norm(S) < 5e-4
 
     def test_dirichlet_boundary_exact_zero(self):
-        m = get_model("darcy_fno_2d")(resolution={"x": 33, "y": 33})
+        m = get_model("darcy_fno_2d")(resolution={"x": 33, "y": 33}, grid="node")
         u = m.solve(m.generate_ic(seed=1))
         assert np.abs(u[0, :]).max() == 0.0
         assert np.abs(u[:, -1]).max() == 0.0
+
+    def test_canonical_grid_is_cell_centred_and_boundary_is_not_zero(self):
+        """
+        The published data's defining quirk: the solve is on the node grid,
+        but the arrays are resampled to cell centres, so the boundary values
+        are small and NONZERO. Getting this wrong costs 0.5% (it was the one
+        discrepancy left against the distributed file).
+        """
+        m = get_model("darcy_fno_2d")(resolution={"x": 65, "y": 65})
+        assert np.isclose(m.grids["x"][0], 1 / 130)  # (2i+1)/(2K), not 0
+
+        # the boundary value is the half-cell offset, so it must halve when
+        # the grid doubles — that scaling is the fingerprint, not the value
+        def edge_over_peak(k):
+            model = get_model("darcy_fno_2d")(resolution={"x": k, "y": k})
+            u = model.solve(np.ones((k, k)))
+            return float(np.abs(u[0]).max() / u.max())
+
+        e1, e2 = edge_over_peak(65), edge_over_peak(129)
+        assert 0.0 < e2 < e1
+        assert abs(e1 / e2 - 2.0) < 0.05
+
+        # and the clean convention differs from the canonical by ~1%, well
+        # above round-off: the grid convention is a real choice, not a detail
+        clean = get_model("darcy_fno_2d")(resolution={"x": 65, "y": 65}, grid="node")
+        a = m.generate_ic(seed=1)
+        rel = np.linalg.norm(m.solve(a) - clean.solve(a)) / np.linalg.norm(
+            clean.solve(a)
+        )
+        assert 1e-3 < rel < 1e-1
 
 
 class TestCanonicalMeasures:
@@ -63,8 +94,36 @@ class TestCanonicalMeasures:
         sigma (a per-sample rescale would condition the measure)."""
         m = get_model("darcy_fno_2d")(resolution={"x": 129, "y": 129})
         stds = [np.log(m.generate_ic(seed=s)).std() for s in range(30)]
-        assert 0.2 < np.mean(stds) < 0.4  # around sigma = 0.2918
+        assert 0.2 < np.mean(stds) < 0.4  # around sigma = 0.292083
         assert np.std(stds) > 0.03  # genuine measure fluctuation
+
+    def test_canonical_sigma_is_derived_not_fitted(self):
+        """
+        GRF.m fixes the scale as tau^(alpha-1) with no free constant. The
+        0.2918 once measured off the distributed data is that constant, and
+        the formula must reproduce it — and keep working when alpha or tau
+        move, which a hard-coded number cannot.
+        """
+        from pdeforge.generators.initial_conditions import GRFNeumannGenerator
+
+        g = GRFNeumannGenerator(alpha=2.0, tau=3.0)
+        assert abs(g.expected_std((421, 421)) - 0.292083) < 1e-5
+        assert abs(g.expected_std((421, 421)) - 0.2918) < 1e-3  # the old fit
+
+        # empirically, over the measure itself
+        n, shape = 40, (65, 65)
+        rms = np.sqrt(np.mean([g.generate(shape, seed=s) ** 2 for s in range(n)]))
+        assert abs(rms - g.expected_std(shape)) < 0.02
+
+        # a different measure gets a different constant, not 0.2918
+        rough = GRFNeumannGenerator(alpha=1.5, tau=7.0)
+        assert abs(rough.expected_std((129, 129)) - 0.2918) > 0.05
+        rms_r = np.sqrt(
+            np.mean([rough.generate((129, 129), seed=s) ** 2 for s in range(n)])
+        )
+        assert abs(rms_r - rough.expected_std((129, 129))) < 0.05 * rough.expected_std(
+            (129, 129)
+        )
 
     def test_piececonst_values_and_fraction(self):
         m = get_model("darcy_fno_2d")(
@@ -155,16 +214,10 @@ class TestDarcy421Shootout:
     def test_their_inputs_reproduce_their_outputs(self):
         d = np.load(DARCY421)
         m = get_model("darcy_fno_2d")(resolution={"x": 421, "y": 421})
-        rels = []
         for k in range(2):
-            a = d["x"][k].astype(np.float64)
-            u_ours = m.solve(a)
+            u_ours = m.solve(d["x"][k].astype(np.float64))
             u_theirs = d["y"][k].astype(np.float64)
-            rels.append(np.linalg.norm(u_ours - u_theirs) / np.linalg.norm(u_theirs))
-        # 0.49% measured: two consistent discretisations of one continuum
-        # problem (their stored data has ~0.8% boundary residue from their
-        # own pipeline, bounding what is achievable).
-        assert max(rels) < 2e-2
+            assert np.linalg.norm(u_ours - u_theirs) / np.linalg.norm(u_theirs) < 1e-7
 
     def test_their_measure_spectrum(self):
         """Spectrum fit of THEIR coefficients recovers alpha=2, tau=3."""
@@ -192,6 +245,72 @@ class TestDarcy421Shootout:
         assert abs(alpha - 2.0) < 0.1
         assert abs(tau - 3.0) < 0.3
         assert r2 > 0.99
+
+
+@pytest.mark.skipif(
+    not DARCY421_PT.exists(),
+    reason="set PDEFORGE_DARCY421_PT to a distributed darcy_*_421.pt file",
+)
+class TestDarcy421BitExact:
+    """
+    The decisive test: THEIR stored coefficients through OUR solver, compared
+    with THEIR stored solutions bit for bit in float32.
+
+    The two pipelines are MATLAB's sparse LU and SciPy's, so the last bit or
+    two of the float64 solve differs; everything above that must agree
+    exactly. Anything worse means a discretisation difference, which is what
+    the grid convention (cell centres, spline transfers) is there to prevent.
+    """
+
+    @staticmethod
+    def _load(n):
+        from pdeforge import load_darcy_fno
+
+        d = load_darcy_fno(DARCY421_PT, n_samples=n, verbose=False)
+        return d.inputs, d.outputs
+
+    def test_reproduces_stored_solutions_to_float32_roundoff(self):
+        a, u = self._load(3)
+        m = get_model("darcy_fno_2d")(resolution={"x": 421, "y": 421})
+        for k in range(a.shape[0]):
+            ours = m.solve(np.asarray(a[k], dtype=np.float64)).astype(np.float32)
+            theirs = np.asarray(u[k], dtype=np.float32)
+            ulps = np.abs(
+                ours.view(np.int32).astype(np.int64)
+                - theirs.view(np.int32).astype(np.int64)
+            )
+            identical = (ours == theirs).mean()
+            assert ulps.max() <= 4, f"sample {k}: {ulps.max()} ulp"
+            assert identical > 0.98, f"sample {k}: only {identical:.3%} identical"
+
+    def test_grid_convention_is_load_bearing(self):
+        """Solving on the node grid instead loses three orders of magnitude."""
+        a, u = self._load(1)
+        a0, u0 = np.asarray(a[0], dtype=np.float64), np.asarray(u[0], dtype=np.float64)
+
+        def rel(model):
+            return np.linalg.norm(model.solve(a0) - u0) / np.linalg.norm(u0)
+
+        canonical = get_model("darcy_fno_2d")(resolution={"x": 421, "y": 421})
+        node = get_model("darcy_fno_2d")(resolution={"x": 421, "y": 421}, grid="node")
+        assert rel(canonical) < 1e-7
+        assert rel(node) > 1e-3
+
+    def test_published_boundary_is_nonzero(self):
+        """
+        Their u is a node-grid solution resampled to cell centres, so the
+        stored boundary carries the half-cell offset rather than the exact
+        zero a naive reading would expect.
+        """
+        _, u = self._load(2)
+        for k in range(u.shape[0]):
+            uk = np.asarray(u[k], dtype=np.float64)
+            assert 0 < np.abs(uk[0]).max() < 0.02 * uk.max()
+
+    def test_reader_needs_no_torch(self):
+        import sys
+
+        assert "torch" not in sys.modules
 
 
 @pytest.mark.skipif(
@@ -387,9 +506,7 @@ class TestMPPDEKdV:
         )
 
         def run(T, mask):
-            return get_model("kdv_1d")(
-                **{**kw, "time_end": T}, dealias=mask
-            ).solve(u0)
+            return get_model("kdv_1d")(**{**kw, "time_end": T}, dealias=mask).solve(u0)
 
         def rel(a, b):
             return np.linalg.norm(a - b) / np.linalg.norm(b)
@@ -588,6 +705,148 @@ def _vtk_xml_doc(arrays, compressed, header_type="UInt32"):
     )
 
 
+class _StorageRef:
+    """Placeholder for a torch storage; pickled through persistent_id."""
+
+    def __init__(self, key, array):
+        self.key, self.numel, self.dtype = key, array.size, array.dtype
+
+
+class _Reduced:
+    """An object that pickles as ``func(*args)``."""
+
+    def __init__(self, func, args):
+        self.func, self.args = func, args
+
+    def __reduce__(self):
+        return (self.func, self.args)
+
+
+_STORAGE_NAMES = {
+    np.dtype("float32"): "FloatStorage",
+    np.dtype("float64"): "DoubleStorage",
+    np.dtype("int64"): "LongStorage",
+}
+
+
+def _torch_pt_archive(path, tensors):
+    """
+    Write a torch.save-format zip without torch: a stub `torch` module lives
+    just long enough for pickle to resolve the globals torch would have
+    written, then goes away, so the reader is still exercised on a
+    torch-free interpreter.
+    """
+    import io
+    import pickle
+    import sys
+    import types
+    import zipfile
+
+    stub = types.ModuleType("torch")
+
+    def _rebuild_tensor_v2(*args):
+        raise NotImplementedError  # never called; only its name is pickled
+
+    _rebuild_tensor_v2.__module__ = "torch"
+    _rebuild_tensor_v2.__qualname__ = "_rebuild_tensor_v2"
+    stub._rebuild_tensor_v2 = _rebuild_tensor_v2
+    for name in _STORAGE_NAMES.values():
+        setattr(stub, name, type(name, (), {"__module__": "torch"}))
+
+    class _Pickler(pickle.Pickler):
+        def persistent_id(self, obj):
+            if isinstance(obj, _StorageRef):
+                storage_cls = getattr(stub, _STORAGE_NAMES[obj.dtype])
+                return ("storage", storage_cls, obj.key, "cpu", obj.numel)
+            return None
+
+    payload = {
+        name: _Reduced(
+            _rebuild_tensor_v2,
+            (
+                _StorageRef(str(i), a),
+                0,
+                tuple(a.shape),
+                tuple(s // a.dtype.itemsize for s in a.strides),
+                False,
+                None,
+            ),
+        )
+        for i, (name, a) in enumerate(tensors.items())
+    }
+
+    buf = io.BytesIO()
+    sys.modules["torch"] = stub
+    try:
+        _Pickler(buf, protocol=2).dump(payload)
+    finally:
+        del sys.modules["torch"]
+
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_STORED) as z:
+        z.writestr("archive/data.pkl", buf.getvalue())
+        z.writestr("archive/version", "3\n")
+        for i, a in enumerate(tensors.values()):
+            z.writestr(f"archive/data/{i}", np.ascontiguousarray(a).tobytes())
+
+
+class TestTorchPtReader:
+    """
+    Reading .pt without PyTorch, so a 2 GB framework is not a prerequisite
+    for looking at a float array. Round-trips need no external data.
+    """
+
+    def test_round_trip(self, tmp_path):
+        from pdeforge.io.torch_pt import read_torch_pt
+
+        rng = np.random.default_rng(0)
+        tensors = {
+            "x": rng.standard_normal((5, 7, 7)).astype(np.float32),
+            "y": rng.standard_normal((5, 7, 7)).astype(np.float64),
+        }
+        f = tmp_path / "d.pt"
+        _torch_pt_archive(f, tensors)
+
+        for mmap in (True, False):
+            got = read_torch_pt(f, mmap=mmap)
+            assert set(got) == {"x", "y"}
+            for k, a in tensors.items():
+                assert got[k].dtype == a.dtype and got[k].shape == a.shape
+                assert np.array_equal(got[k], a)
+
+    def test_keys_subset(self, tmp_path):
+        from pdeforge.io.torch_pt import read_torch_pt
+
+        f = tmp_path / "d.pt"
+        _torch_pt_archive(
+            f, {"x": np.zeros((2, 3), np.float32), "y": np.ones((2, 3), np.float32)}
+        )
+        assert set(read_torch_pt(f, keys=["y"])) == {"y"}
+
+    def test_refuses_non_tensor_payloads(self, tmp_path):
+        """A pickle can carry arbitrary classes; this reader must not run them."""
+        import pickle
+        import zipfile
+
+        f = tmp_path / "bad.pt"
+        with zipfile.ZipFile(f, "w", zipfile.ZIP_STORED) as z:
+            z.writestr("archive/data.pkl", pickle.dumps({"m": __import__("os").getcwd}))
+        from pdeforge.io.torch_pt import read_torch_pt
+
+        with pytest.raises(NotImplementedError):
+            read_torch_pt(f)
+
+    def test_legacy_archive_rejected(self, tmp_path):
+        import zipfile
+
+        f = tmp_path / "old.pt"
+        with zipfile.ZipFile(f, "w") as z:
+            z.writestr("junk", "x")
+        from pdeforge.io.torch_pt import read_torch_pt
+
+        with pytest.raises(ValueError, match="data.pkl"):
+            read_torch_pt(f)
+
+
 class TestVTKXMLReader:
     """
     The reader exists so AirfRANS interop does not drag vtk/pyvista/meshio
@@ -669,8 +928,12 @@ class TestAirfRANSInterop:
         from pdeforge import load_airfrans
 
         d = load_airfrans(
-            AIRFRANS_ROOT, split="full_train", n_samples=3, n_points=8192,
-            seed=0, verbose=False,
+            AIRFRANS_ROOT,
+            split="full_train",
+            n_samples=3,
+            n_points=8192,
+            seed=0,
+            verbose=False,
         )
         assert d.inputs.shape == (3, 8192, 8)
         assert d.outputs.shape == (3, 8192, 4)
@@ -687,8 +950,12 @@ class TestAirfRANSInterop:
         from pdeforge.io.airfrans import surface_pressure
 
         d = load_airfrans(
-            AIRFRANS_ROOT, split="full_train", n_samples=5, n_points=8192,
-            seed=0, verbose=False,
+            AIRFRANS_ROOT,
+            split="full_train",
+            n_samples=5,
+            n_points=8192,
+            seed=0,
+            verbose=False,
         )
         for i in range(d.n_samples):
             cp = surface_pressure(d, i)["cp"]
@@ -701,8 +968,13 @@ class TestAirfRANSInterop:
         from pdeforge import load_airfrans
 
         d = load_airfrans(
-            AIRFRANS_ROOT, split="full_train", n_samples=2, n_points=8192,
-            keep_surface=True, seed=0, verbose=False,
+            AIRFRANS_ROOT,
+            split="full_train",
+            n_samples=2,
+            n_points=8192,
+            keep_surface=True,
+            seed=0,
+            verbose=False,
         )
         names = d.input_names
         for i in range(d.n_samples):
@@ -728,8 +1000,13 @@ class TestAirfRANSInterop:
         from pdeforge import load_airfrans
 
         d = load_airfrans(
-            AIRFRANS_ROOT, split="full_train", n_samples=1, n_points=8192,
-            keep_surface=False, seed=0, verbose=False,
+            AIRFRANS_ROOT,
+            split="full_train",
+            n_samples=1,
+            n_points=8192,
+            keep_surface=False,
+            seed=0,
+            verbose=False,
         )
         wall = d.inputs[0, :, d.input_names.index("surface")] > 0.5
         assert wall.sum() < 200

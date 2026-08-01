@@ -617,7 +617,7 @@ print(describe_model("burgers_1d"))
 | `cylinder_flow_2d_unsteady` | Vortex shedding (time-dep) | 2D+t | FEniCSx |
 | `cylinder_flow_2d_parameterized` | Variable obstacle position | 2D | FEniCSx |
 | `cylinder_flow_2d_turbulent` | High-Re LES turbulence | 2D+t | FEniCSx |
-| `darcy_fno_2d` | Canonical FNO Darcy (validated, knobbed) | 2D | FD direct |
+| `darcy_fno_2d` | Canonical FNO Darcy (bit-exact, knobbed) | 2D | FD direct |
 | `darcy_fno_3d` | Canonical Darcy measure in 3D (CG solver) | 3D | FD/CG |
 | `naca_flow_2d` | NACA airfoil family (SDF → flow + Cl/Cd) | 2D | FEniCSx |
 | `airfoil_euler_2d` | Transonic airfoil (shock-capturing; mesh → flow + Cl/Cd) | 2D | FV (HLLC) |

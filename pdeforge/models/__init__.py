@@ -103,6 +103,7 @@ __all__ = [
 ]
 
 from pdeforge.models.advection_1d import Advection1D
+from pdeforge.models.airfoil_euler_2d import AirfoilEuler2D
 from pdeforge.models.allen_cahn_3d import AllenCahn3D
 from pdeforge.models.burgers_2d import Burgers2D
 from pdeforge.models.darcy_fno_2d import DarcyFNO2D
@@ -111,7 +112,6 @@ from pdeforge.models.gray_scott_2d import GrayScott2D
 from pdeforge.models.heat_3d import Heat3D
 from pdeforge.models.helmholtz_2d import Helmholtz2D
 from pdeforge.models.heterogeneous_wave_2d import HeterogeneousWave2D
-from pdeforge.models.airfoil_euler_2d import AirfoilEuler2D
 from pdeforge.models.kdv_1d import KdV1D
 from pdeforge.models.kolmogorov_flow_2d import KolmogorovFlow2D
 from pdeforge.models.ks_1d import KuramotoSivashinsky1D

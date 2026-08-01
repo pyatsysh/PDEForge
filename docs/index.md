@@ -62,9 +62,10 @@ splits = data.split(train=0.6, val=0.15, cal=0.15, test=0.1)
   [Available Models](guide/models.md).
 - **The canon, regenerable**: classic benchmark setups ship as presets with
   every hyperparameter exposed. The Darcy generator reproduces the
-  distributed FNO data to 0.49% relative L2, with the input measure
-  recovered from the data itself (spectrum fit R^2 = 0.998), and extends
-  the same measure to 3D, where no frozen dataset exists.
+  distributed FNO data *bit for bit*: 99% of the 177,241 float32 values in
+  a 421 x 421 sample are identical and none differs by more than 2 ulp,
+  which is MATLAB's sparse LU against SciPy's. The same measure extends to
+  3D, where no frozen dataset exists.
 - **UQ-native**: dedicated calibration splits for conformal prediction,
   out-of-distribution splits by parameter range, multi-fidelity pairs,
   observation operators; see the [Calibration Protocol](guide/calibration.md).

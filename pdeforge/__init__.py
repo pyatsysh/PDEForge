@@ -225,7 +225,9 @@ def reproduce(source, verbose=True, n_jobs=1):
 
 from pdeforge._version import __version__
 from pdeforge.io.airfrans import load_airfrans
+from pdeforge.io.darcy_fno import load_darcy_fno
 from pdeforge.io.datasets import export_pdebench, load_dataset, save_dataset
+from pdeforge.io.torch_pt import read_torch_pt
 from pdeforge.io.vtk_xml import read_vtk_xml
 from pdeforge.presets import list_presets
 
@@ -236,7 +238,9 @@ __all__ = [
     "save_dataset",
     "export_pdebench",
     "load_airfrans",
+    "load_darcy_fno",
     "read_vtk_xml",
+    "read_torch_pt",
     "list_presets",
     "list_models",
     "describe_model",
