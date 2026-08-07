@@ -277,6 +277,60 @@
   margin-top: 0.4rem;
 }
 
+/* ---------- per-model pages ----------
+   Each model page opens on one 2:1 figure showing the operator that model
+   defines: input left, output right. Authored AT 2:1 so no letterbox shows;
+   the surface color stays behind for the odd figure that misses the ratio. */
+.pf-model-fig {
+  margin: 0 0 1.8rem;
+}
+.pf-model-fig img {
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  object-fit: contain;
+  background: #2e3440;
+  border-radius: 2px;
+  display: block;
+  box-shadow: 0 1px 4px rgba(46, 52, 64, 0.18);
+}
+.pf-model-fig figcaption {
+  font-family: "Crimson Text", serif;
+  font-style: italic;
+  font-size: 0.78rem;
+  color: var(--md-default-fg-color--light);
+  margin-top: 0.45rem;
+}
+
+/* The catalogue grid on the Models index: same 2:1 cells, three across. */
+.pf-model-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1.1rem;
+  margin: 1.2rem 0 2rem;
+}
+.pf-model-grid figure {
+  margin: 0;
+}
+.pf-model-grid img {
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  object-fit: contain;
+  background: #2e3440;
+  border-radius: 2px;
+  display: block;
+}
+.pf-model-grid figcaption {
+  font-family: "Crimson Text", serif;
+  font-style: italic;
+  font-size: 0.76rem;
+  color: var(--md-default-fg-color--light);
+  margin-top: 0.35rem;
+  line-height: 1.35;
+}
+.pf-model-grid figcaption a {
+  font-style: normal;
+}
+
 /* ---------- admonitions: nord palette (R7) ----------
    Light borders = nord hue with lightness lowered until >= 3:1 on the
    nord6 field (computed, not eyeballed); dark borders = native nord steps
