@@ -7,6 +7,11 @@ the distributed solutions with **99.1% of the 177,241 float32 values
 identical and none more than 2 ulp out**. That residue is MATLAB's sparse LU
 against SciPy's, and nothing else.
 
+<figure class="pf-model-fig" markdown>
+![Canonical FNO Darcy](../figures/model_darcy_fno_2d.png)
+<figcaption>The log-normal coefficient a(x, y) and the pressure u it induces, at the canonical 421 x 421 (<code>darcy_fno_2d</code>).</figcaption>
+</figure>
+
 ## Equation
 
 $$-\nabla \cdot \big(a(x,y)\,\nabla u\big) = f \quad \text{on } [0,1]^2,
@@ -33,7 +38,7 @@ normalisation fixes it, giving \(\sigma = 0.292083\) at the canonical
 is the knob you want; leave it `None` and \(\alpha\) and \(\tau\) stay
 honest knobs.
 
-## The grid convention, which is load-bearing
+## The grid convention, which decides everything downstream
 
 The published generator does something no one would guess from the data.
 It **solves** on the node grid, \(K\) points at \(i/(K-1)\) with zero

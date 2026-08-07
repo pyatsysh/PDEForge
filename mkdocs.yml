@@ -80,11 +80,55 @@ nav:
       - Data Formats: guide/data-formats.md
       - Calibration Protocol: guide/calibration.md
   - Models:
-      - Burgers 1D: models/burgers_1d.md
-      - Canonical FNO Darcy: models/darcy_fno_2d.md
-      - Darcy 2D: models/darcy_2d.md
-      - Stokes 2D: models/stokes_2d.md
-      - Cylinder Flow 2D: models/cylinder_flow_2d.md
+      - All models: models/index.md
+      - Diffusion and transport:
+          - Heat 1D: models/heat_1d.md
+          - Heat 2D: models/heat_2d.md
+          - Heat 3D: models/heat_3d.md
+          - Advection 1D: models/advection_1d.md
+          - Darcy 2D: models/darcy_2d.md
+      - Waves and dispersion:
+          - Wave 1D: models/wave_1d.md
+          - Wave 2D: models/wave_2d.md
+          - Heterogeneous Wave 2D: models/heterogeneous_wave_2d.md
+          - Helmholtz 2D: models/helmholtz_2d.md
+          - KdV 1D: models/kdv_1d.md
+          - Schrodinger 1D: models/schrodinger_1d.md
+      - Nonlinear advection and turbulence:
+          - Burgers 1D: models/burgers_1d.md
+          - Burgers 2D: models/burgers_2d.md
+          - Kuramoto-Sivashinsky 1D: models/ks_1d.md
+          - Navier-Stokes vorticity 2D: models/ns_vorticity_2d.md
+          - Kolmogorov Flow 2D: models/kolmogorov_flow_2d.md
+          - Shallow Water 2D: models/shallow_water_2d.md
+      - Pattern formation and phase separation:
+          - Allen-Cahn 1D: models/allen_cahn_1d.md
+          - Allen-Cahn 2D: models/allen_cahn_2d.md
+          - Allen-Cahn 3D: models/allen_cahn_3d.md
+          - Cahn-Hilliard: models/cahn_hilliard.md
+          - Gray-Scott 2D: models/gray_scott_2d.md
+          - FitzHugh-Nagumo 1D: models/fitzhugh_nagumo_1d.md
+          - FitzHugh-Nagumo 2D: models/fitzhugh_nagumo_2d.md
+          - Lotka-Volterra 2D: models/lotka_volterra_2d.md
+      - Porous media and solids:
+          - Canonical FNO Darcy: models/darcy_fno_2d.md
+          - Canonical Darcy 3D: models/darcy_fno_3d.md
+          - Elasticity 2D: models/elasticity_2d.md
+          - Porous Darcy FEM: models/porous_darcy_fem.md
+      - Viscous and compressible flow:
+          - Stokes 2D: models/stokes_2d.md
+          - Cylinder Flow 2D: models/cylinder_flow_2d.md
+          - Cylinder Flow 2D unsteady: models/cylinder_flow_2d_unsteady.md
+          - Cylinder Flow 2D parameterized: models/cylinder_flow_2d_parameterized.md
+          - Cylinder Flow 2D turbulent: models/cylinder_flow_2d_turbulent.md
+          - NACA Flow 2D: models/naca_flow_2d.md
+          - Rayleigh-Benard 2D: models/rayleigh_benard_2d.md
+          - Transonic Airfoil Euler: models/airfoil_euler_2d.md
+      - Stochastic PDEs:
+          - Stochastic Heat 1D: models/stochastic_heat_1d.md
+          - Stochastic Heat 2D: models/stochastic_heat_2d.md
+          - Stochastic Burgers 1D: models/stochastic_burgers_1d.md
+          - Stochastic Allen-Cahn 2D: models/stochastic_allen_cahn_2d.md
   - Advanced:
       - Adding Custom Models: advanced/custom-models.md
       - Performance: advanced/performance.md

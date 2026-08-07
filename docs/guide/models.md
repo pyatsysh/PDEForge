@@ -1,372 +1,166 @@
 # Available Models
 
-PDEForge provides implementations of several PDE problems commonly used in operator learning research.
-
-## Spectral Models
-
-These models use FFT-based solvers and work with the base installation.
-
-### Burgers 1D (`burgers_1d`)
-
-The viscous Burgers equation models advection with diffusion:
-
-$$\frac{\partial u}{\partial t} + u \frac{\partial u}{\partial x} = \nu \frac{\partial^2 u}{\partial x^2}$$
-
-**Operator learning task**: Initial condition to solution at final time
-
-$$u(x, 0) \mapsto u(x, T)$$
+PDEForge ships 41 models under one API. Every one of them is called the same
+way, and each has its own page under [Models](../models/index.md) covering the
+equation, the operator task, the parameters and their ranges, a runnable
+snippet, and a figure.
 
 ```python
+from pdeforge import generate_dataset
+
 dataset = generate_dataset(
     model="burgers_1d",
     n_samples=1000,
     resolution={"x": 256},
-    params={
-        "viscosity": 0.01,      # Diffusion coefficient
-        "time_horizon": 1.0,    # Final time T
-    },
+    params={"viscosity": 0.01, "time_horizon": 1.0},
+    seed=42,
 )
 ```
 
-### Darcy 2D (`darcy_2d`)
+This page is the catalogue. Start from the [Models index](../models/index.md)
+if you would rather browse by physics with the figures alongside.
 
-Steady-state flow through porous media:
+## What you need installed
 
-$$-\nabla \cdot (\kappa(x,y) \nabla u) = f$$
-
-**Operator learning task**: Permeability field to pressure field
-
-$$\kappa(x,y) \mapsto u(x,y)$$
-
-```python
-dataset = generate_dataset(
-    model="darcy_2d",
-    n_samples=1000,
-    resolution={"x": 64, "y": 64},
-    params={
-        "kappa_min": 0.1,    # Minimum permeability
-        "kappa_max": 10.0,   # Maximum permeability
-    },
-)
-```
-
-### Stokes 2D (`stokes_2d`)
-
-Incompressible viscous flow at low Reynolds number:
-
-$$-\mu \nabla^2 \mathbf{u} + \nabla p = \mathbf{f}, \quad \nabla \cdot \mathbf{u} = 0$$
-
-**Operator learning task**: Body force to velocity and pressure fields
-
-$$(f_x, f_y) \mapsto (u, v, p)$$
-
-```python
-dataset = generate_dataset(
-    model="stokes_2d",
-    n_samples=1000,
-    resolution={"x": 64, "y": 64},
-    params={
-        "viscosity": 1.0,
-        "n_force_modes": 5,   # Fourier modes in forcing
-    },
-)
-```
-
-### KdV 1D (`kdv_1d`)
-
-One model, one solver, several regimes. `kdv_1d` solves
-
-$$\frac{\partial u}{\partial t} + \mu\, u \frac{\partial u}{\partial x} + \delta^2 \frac{\partial^3 u}{\partial x^3} = 0$$
-
-on a periodic box, with the stiff dispersion $i\,\delta^2 k^3$ integrated
-exactly by ETDRK4 — the stiffness that cripples explicit schemes never
-appears; only $\mu\,u u_x$ is stepped. Defaults are the textbook
-normalisation ($\mu = 6$, $\delta^2 = 1$ on $[0, 20]$, soliton input measure).
-
-The published KdV setups differ only in coefficients, box, and input measure,
-so they ship as **presets** rather than separate models:
-
-| Preset | Regime |
-|---|---|
-| *(model default)* | Solitons: $\mu=6$, $\delta^2=1$, $L=20$, elastic collisions |
-| `kdv_dsw_1d` | Undular bore, $\delta^2 = 8\times10^{-6}$ — un-resolvable bias set |
-| `kdv_dsw_epistemic_1d` | Undular bore, $\delta^2 = 4\times10^{-5}$ — near-resolvable |
-| `mp_pde_kdv_1d` | Brandstetter et al. benchmark, $\mu=\delta^2=1$, $L=128$ |
-| `mp_pde_kdv_easy_1d` | The same at $T = 50$ |
-
-#### Dispersive shock waves (`kdv_dsw_1d`, `kdv_dsw_epistemic_1d`)
-
-A localised smooth **depression** (the `depression_box` input measure) does not
-steepen into a thin front; under KdV it dissolves into a **dispersive shock
-wave** (an undular bore) — sustained high-wavenumber oscillations filling a
-large, contiguous region. Where a Burgers shock mis-samples only a
-$\sqrt{\nu}$-thin front, the bore is hard for a band-limited operator
-*everywhere it lives*, which makes it a stringent operator / UQ benchmark.
-
-```python
-dataset = generate_dataset(preset="kdv_dsw_1d", n_samples=1000, seed=0)
-```
-
-The two bore presets are a matched pair. At $n_x = 512$ the vigorous bore
-($\delta^2 = 8\times10^{-6}$) shows ~155 oscillations but is *not* grid
-converged — it has ~429 at $n_x = 2048$, so its hardness is a **bias** floor
-no amount of data removes. The longer-wavelength bore ($4\times10^{-5}$) shows
-~83 oscillations and is already converged at $n_x = 512$, so its hardness is
-**epistemic** (data-limited). That contrast is what makes them useful together
-for method comparison.
-
-!!! note "Spectral centroid will mislead you here"
-    With dealiasing on, the 2/3 mask truncates the $8\times10^{-6}$ bore, so
-    its spectral centroid reads *lower* (3.8) than the resolvable bore's
-    (10.3) despite having the shorter wavelength. Count oscillations, not
-    centroid — the truncation is the phenomenon, not an artefact to average over.
-
-#### The neural-emulator benchmark regime (`mp_pde_kdv_1d`)
-
-Brandstetter et al. (*Message Passing Neural PDE Solvers*, arXiv:2202.03376;
-*Lie Point Symmetry Data Augmentation*, arXiv:2202.07643) use
-$\mu = \delta^2 = 1$ on a long $L = 128$ box. That whole setup ships as a
-preset:
-
-```python
-dataset = generate_dataset(preset="mp_pde_kdv_1d", n_samples=512, seed=0)
-# -> inputs (512, 256), outputs (512, 140, 256) trajectories
-```
-
-The preset pins the four things that make that regime what it is:
-
-| Setting | Value | Why it matters |
+| Group | Count | Requirement |
 |---|---|---|
-| `advection`, `dispersion` | `1.0`, `1.0` | Not the textbook $\mu = 6$ — different soliton amplitude-speed law |
-| `ic_generator="sine_series"` | 10 waves, $l \in \{1, 2\}$ | Long-wave random sine series (see below) |
-| `scale_jitter` | `0.1` | Each trajectory draws its own $L$ and $T$ within $\pm 10\%$ |
-| `_n_frames_kept` | `140` of `250` | Trajectories start at $t \approx 0.44\,T$, from a developed soliton gas — not from the IC |
+| Spectral | 30 | base installation |
+| Finite-difference elliptic | 2 | base installation |
+| Finite volume | 1 | base installation (pure NumPy) |
+| Finite element | 8 | [FEniCSx setup](../getting-started/fenicsx.md) or the Docker image |
 
-**The input measure.** `sine_series` (`TruncatedSineGenerator`) draws
+Two of the spectral models, [`ns_vorticity_2d`](../models/ns_vorticity_2d.md)
+and [`kolmogorov_flow_2d`](../models/kolmogorov_flow_2d.md), run considerably
+faster with `backend="jax"`, and [`gray_scott_2d`](../models/gray_scott_2d.md)
+benefits at long horizons.
 
-$$u_0(x) = \sum_{j=1}^{N} A_j \sin\!\left(2\pi l_j x / L + \phi_j\right)$$
+## The catalogue
 
-with $A_j \sim U(-0.5, 0.5)$, $\phi_j \sim U(0, 2\pi)$, and integer $l_j$ from
-the **half-open** range $[l_\min, l_\max)$. The canonical $(1, 3)$ therefore
-excites modes 1 and 2 only, never 3 — closing the interval would silently
-widen the measure. The field is exactly zero-mean on a uniform periodic grid,
-which KdV then conserves.
+### Diffusion and transport
 
-**Scale jitter.** KdV's scaling symmetry
-$(u, x, t) \mapsto (\lambda^2 u, x/\lambda, t/\lambda^3)$ is what makes a
-randomised box worth having rather than a relabelling. Because this measure is
-a function of $x/L$, jitter leaves the *initial conditions* untouched and
-perturbs only the dynamics. Note that the dataset's stored grid stays
-**nominal**: per-sample $dx$ and $dt$ differ from it by up to the jitter
-fraction, so the genuinely shared coordinate is $x/L$. Jitter requires
-`backend="numpy"`.
-
-**Dealiasing.** The preset sets `dealias=False` to match the reference
-generator's `psdiff` right-hand side. This is not just fidelity theatre — at
-$n_x = 256$ the 2/3 mask also removes *genuine* spectral content once KdV has
-broadened the spectrum. Measured against a converged $n_x = 1024$ reference at
-$T = 100$: un-dealiased ETDRK4 sits at $8 \times 10^{-7}$ relative $L^2$,
-dealiased at $1 \times 10^{-4}$, and the reference generator's own
-Radau + `psdiff` scheme at $2.9 \times 10^{-4}$. `_dt = 5e-3` is converged
-there.
-
-## FEniCSx Models
-
-These require FEniCSx installation. See [FEniCSx Setup](../getting-started/fenicsx.md).
-
-### Cylinder Flow 2D (`cylinder_flow_2d`)
-
-Steady Navier-Stokes flow around a circular cylinder:
-
-$$\rho (\mathbf{u} \cdot \nabla) \mathbf{u} - \mu \nabla^2 \mathbf{u} + \nabla p = 0$$
-$$\nabla \cdot \mathbf{u} = 0$$
-
-**Operator learning task**: Inlet velocity scale to flow field
-
-$$\text{inlet scale} \mapsto (u, v, p)$$
-
-```python
-dataset = generate_dataset(
-    model="cylinder_flow_2d",
-    n_samples=100,
-    resolution={"x": 128, "y": 64},
-    params={
-        "viscosity": 0.001,
-        "inlet_velocity": 0.3,
-        "cylinder_radius": 0.05,
-    },
-)
-```
-
-### Cylinder Flow 2D Unsteady (`cylinder_flow_2d_unsteady`)
-
-Time-dependent flow exhibiting vortex shedding (von Karman vortex street):
-
-**Operator learning task**: Inlet velocity to time-dependent flow trajectory
-
-```python
-dataset = generate_dataset(
-    model="cylinder_flow_2d_unsteady",
-    n_samples=10,
-    resolution={"x": 110, "y": 41},
-    params={
-        "inlet_velocity": 1.0,
-        "time_end": 8.0,
-        "_n_time_steps": 81,
-    },
-)
-# Output shape: (10, 81, 41, 110, 3)
-```
-
-### Elasticity 2D (`elasticity_2d`)
-
-Plane-strain linear elasticity with random stiff inclusions; the operator
-task maps the Young's-modulus field to displacement and von Mises stress.
-Validated by the Clapeyron energy balance at solver precision.
-
-```python
-dataset = generate_dataset(
-    model="elasticity_2d",
-    n_samples=100,
-    resolution={"x": 64, "y": 64},
-    params={"e_inclusion": 10.0, "traction_y": -1.0},
-)
-```
-
-### Rayleigh-Benard 2D (`rayleigh_benard_2d`)
-
-Boussinesq convection in the closed unit cavity (hot bottom, cold top,
-no-slip walls). Below Ra_c the solver returns the conduction state with
-Nu = 1; above it, convection rolls whose selection depends on the seeded
-perturbation. Plate-averaged Nusselt numbers are stored per solve.
-
-```python
-dataset = generate_dataset(
-    model="rayleigh_benard_2d",
-    n_samples=20,
-    resolution={"x": 64, "y": 64},
-    params={"rayleigh": 1e4, "prandtl": 0.71},
-)
-```
-
-### Porous Darcy FEM (`porous_darcy_fem`)
-
-The cross-model pipeline: a seeded Cahn-Hilliard run grows a two-phase
-morphology, binarized into a permeability field; steady Darcy flow crosses
-it under a unit pressure drop. Effective permeability is stored per
-sample; flux balance and the pressure maximum principle are validated.
-
-```python
-dataset = generate_dataset(
-    model="porous_darcy_fem",
-    n_samples=100,
-    resolution={"x": 64, "y": 64},
-    params={"ch_time": 8.0, "permeability_contrast": 1e3},
-)
-```
-
-## Finite-Volume Models
-
-Shock-capturing solvers, for flows where a spectral method would ring and a
-smooth FEM discretisation would smear. No extra install: pure NumPy.
-
-### Transonic Airfoil Euler (`airfoil_euler_2d`)
-
-Steady compressible Euler around a parameterized NACA 4-digit airfoil:
-
-$$\frac{\partial}{\partial t}\begin{pmatrix}\rho \\ \rho u \\ \rho v \\ \rho E\end{pmatrix} + \nabla \cdot \mathbf{F} = 0$$
-
-marched to steady state on a body-fitted **C-grid** with cell-centred finite
-volumes, HLLC fluxes, MUSCL/minmod reconstruction and a local time step. At the
-transonic condition the flow accelerates past Mach 1 over the upper surface and
-closes with a **shock** — the feature that makes this a genuinely different
-learning problem from every smooth model in the catalogue, and one a Fourier
-method would ring across.
-
-**Geometry is the data.** Every sample draws its own airfoil (thickness,
-camber, camber position) and flow condition (freestream Mach, angle of attack);
-the mesh is rebuilt around it and the solution returned *on that mesh*. The
-operator-learning task is therefore the Geo-FNO one — a deformed mesh in, the
-field on it out — rather than a fixed Cartesian grid:
-
-$$(x, y)_{\text{mesh}} \mapsto (\rho, u, v, p)$$
-
-```python
-dataset = generate_dataset(
-    model="airfoil_euler_2d",
-    n_samples=200,
-    resolution={"xi": 256, "eta": 64},   # C-grid cell counts
-    params={"mach_range": (0.70, 0.82), "aoa_range": (-1.5, 3.0)},
-    seed=0,
-)
-dataset.inputs.shape           # (200, 256, 64, 2)  the deformed mesh
-dataset.outputs.shape          # (200, 256, 64, 4)  rho, u, v, p
-dataset.metadata["Cl"]         # per-sample lift and drag
-dataset.metadata["transonic_fraction"]   # share of samples with a shock
-```
-
-`xi` wraps the airfoil and both wake cuts, `eta` runs from the wall to the far
-field. `xi` is rounded to even so the surface point count stays odd and the
-sharp trailing edge lands on a node — the Kutta condition then emerges from
-the geometry and the wake cut rather than being enforced.
-
-**Validation.** Three checks, in increasing strength:
-
-| Check | Result |
+| Model | Operator task |
 |---|---|
-| Freestream preservation away from the wall, and across the wake cut | residual $\sim 10^{-13}$ (geometric conservation law; the cut is transparent) |
-| NACA0012, $M=0.5$, $\alpha=0$: d'Alembert says $C_l = C_d = 0$ | $C_l = 0.002$, $C_d = 0.0035$ — the drag is purely scheme dissipation, and falls 8x from first to second order |
-| Stagnation $C_p$ against the exact compressible value 1.064 | 1.017 |
-| NACA0012, $M=0.8$, $\alpha=1.25°$ against the published inviscid benchmark | shock within 1% of station; forces ~10% out (see below) |
+| [`heat_1d`](../models/heat_1d.md) | $u(x,0) \mapsto u(x,T)$ |
+| [`heat_2d`](../models/heat_2d.md) | $u(x,y,0) \mapsto u(x,y,T)$ |
+| [`heat_3d`](../models/heat_3d.md) | the same on the periodic cube |
+| [`advection_1d`](../models/advection_1d.md) | exact translation; the sanity anchor |
+| [`darcy_2d`](../models/darcy_2d.md) | $\kappa(x,y) \mapsto u(x,y)$, periodic |
 
-The transonic case is the one that matters and the one to read carefully:
+### Waves and dispersion
 
-| Grid | $C_l$ | $C_d$ | shock $x/c$ | $M_{\max}$ |
-|---|---|---|---|---|
-| $161 \times 65$ | 0.318 | 0.0259 | 0.626 | 1.357 |
-| $241 \times 81$ | 0.321 | 0.0240 | 0.623 | 1.364 |
-| *published* | *0.352* | *0.0224* | *0.62* | — |
+| Model | Operator task |
+|---|---|
+| [`wave_1d`](../models/wave_1d.md) | $u(x,0) \mapsto u(x,T)$, energy conserved |
+| [`wave_2d`](../models/wave_2d.md) | the same on the square |
+| [`heterogeneous_wave_2d`](../models/heterogeneous_wave_2d.md) | $c(x,y) \mapsto$ wavefield; the medium is the input |
+| [`helmholtz_2d`](../models/helmholtz_2d.md) | $f \mapsto \operatorname{Re} u$, frequency domain |
+| [`kdv_1d`](../models/kdv_1d.md) | solitons, undular bores, benchmark regimes |
+| [`schrodinger_1d`](../models/schrodinger_1d.md) | complex field as two real channels |
 
-The **shock lands within 1% of the published station** and stays there under
-refinement, and the supersonic pocket peaks at $M \approx 1.36$: the flow
-structure is right, which is what a field-predicting dataset is for. The force
-coefficients are about 10% low in lift and 7-15% high in drag, both moving the
-right way with refinement — discretisation, not a modelling error, and neither
-run reached its convergence tolerance within the iteration cap.
+### Nonlinear advection and turbulence
 
-**So treat the fields as the product and the forces as indicative.** Closing
-the last few percent on integrated forces is a tuning exercise (wall-pressure
-extrapolation, deeper convergence, finer meshes) that this model does not
-claim to have done. This comparison runs under `PDEFORGE_SLOW=1`; it takes
-minutes per grid, not seconds.
+| Model | Operator task |
+|---|---|
+| [`burgers_1d`](../models/burgers_1d.md) | shock formation; the regularity ladder |
+| [`burgers_2d`](../models/burgers_2d.md) | vector self-advection, no pressure |
+| [`ks_1d`](../models/ks_1d.md) | spatiotemporal chaos |
+| [`ns_vorticity_2d`](../models/ns_vorticity_2d.md) | $w(\cdot,0) \mapsto w(\cdot,T)$; the canonical benchmark |
+| [`kolmogorov_flow_2d`](../models/kolmogorov_flow_2d.md) | forced, statistically steady turbulence |
+| [`shallow_water_2d`](../models/shallow_water_2d.md) | $(h, hu, hv)$; mass conserved exactly |
 
-!!! note "This model is expensive"
-    A steady transonic solve is thousands of explicit iterations. At
-    $256 \times 64$ expect minutes per sample, so pass `n_jobs=-1` for
-    anything beyond a handful — process-parallel generation is supported and
-    bit-identical to sequential.
+### Pattern formation and phase separation
 
-!!! warning "Not a recreation of anything"
-    This is airfoil data *with knobs* at a shock-carrying condition. It is not
-    a byte-level recreation of the Geo-FNO airfoil dataset (their mesh, solver
-    and sampling are their own), and it is emphatically **not RANS**: for the
-    viscous, turbulence-closed regime PDEForge
-    [reads AirfRANS](data-formats.md#airfrans) rather than rebuilding it.
-    For incompressible airfoil flow with a real viscous wake, see
-    `naca_flow_2d` (FEniCSx).
+| Model | Operator task |
+|---|---|
+| [`allen_cahn_1d`](../models/allen_cahn_1d.md) | interfaces annihilating in pairs |
+| [`allen_cahn_2d`](../models/allen_cahn_2d.md) | curvature-driven coarsening |
+| [`allen_cahn_3d`](../models/allen_cahn_3d.md) | the same on the cube |
+| [`cahn_hilliard`](../models/cahn_hilliard.md) | spinodal decomposition, 2D or 3D |
+| [`gray_scott_2d`](../models/gray_scott_2d.md) | the Pearson parameter plane |
+| [`fitzhugh_nagumo_1d`](../models/fitzhugh_nagumo_1d.md) | excitable pulses past a threshold |
+| [`fitzhugh_nagumo_2d`](../models/fitzhugh_nagumo_2d.md) | broken fronts, spirals |
+| [`lotka_volterra_2d`](../models/lotka_volterra_2d.md) | predator-prey with diffusion |
 
-## Model Information
+### Porous media and solids
 
-Use `describe_model` to see configurable parameters:
+| Model | Operator task | Needs |
+|---|---|---|
+| [`darcy_fno_2d`](../models/darcy_fno_2d.md) | $a \mapsto u$; bit-exact against the published data | base |
+| [`darcy_fno_3d`](../models/darcy_fno_3d.md) | the same measure on the cube | base |
+| [`elasticity_2d`](../models/elasticity_2d.md) | $E \mapsto (u, v, \sigma_{vM})$ | FEniCSx |
+| [`porous_darcy_fem`](../models/porous_darcy_fem.md) | $k \mapsto (p, u_x, u_y)$ through a grown microstructure | FEniCSx |
+
+### Viscous and compressible flow
+
+| Model | Operator task | Needs |
+|---|---|---|
+| [`stokes_2d`](../models/stokes_2d.md) | $(f_x, f_y) \mapsto (u, v, p)$, creeping flow | base |
+| [`cylinder_flow_2d`](../models/cylinder_flow_2d.md) | inlet scale $\mapsto (u, v, p)$ | FEniCSx |
+| [`cylinder_flow_2d_unsteady`](../models/cylinder_flow_2d_unsteady.md) | the vortex street, as a trajectory | FEniCSx |
+| [`cylinder_flow_2d_parameterized`](../models/cylinder_flow_2d_parameterized.md) | cylinder position as input | FEniCSx |
+| [`cylinder_flow_2d_turbulent`](../models/cylinder_flow_2d_turbulent.md) | Re 2000, Smagorinsky LES | FEniCSx |
+| [`naca_flow_2d`](../models/naca_flow_2d.md) | airfoil geometry $\mapsto$ flow, with $C_l$ and $C_d$ | FEniCSx |
+| [`rayleigh_benard_2d`](../models/rayleigh_benard_2d.md) | convection in a cavity, Nusselt-validated | FEniCSx |
+| [`airfoil_euler_2d`](../models/airfoil_euler_2d.md) | transonic Euler with a shock, on a C-grid | base |
+
+### Stochastic PDEs
+
+Each sample carries several realisations of the same solve, so outputs have an
+extra realisation axis and the target is a distribution. See the
+[calibration protocol](calibration.md) and the
+[stochastic systems guide](../advanced/stochastic.md).
+
+| Model | Operator task |
+|---|---|
+| [`stochastic_heat_1d`](../models/stochastic_heat_1d.md) | $u_0 \mapsto \{u_T^{(i)}\}$, Gaussian |
+| [`stochastic_heat_2d`](../models/stochastic_heat_2d.md) | the same on the square |
+| [`stochastic_burgers_1d`](../models/stochastic_burgers_1d.md) | spread concentrated at the fronts |
+| [`stochastic_allen_cahn_2d`](../models/stochastic_allen_cahn_2d.md) | multimodal: realisations branch |
+
+## Presets
+
+Published benchmark setups ship as presets rather than as separate models,
+because they differ from the base model only in coefficients, domain and input
+measure. A preset pins all three together, so the measure travels with the
+physics.
+
+```python
+dataset = generate_dataset(preset="fno_darcy_2d", n_samples=1000, seed=0)
+```
+
+| Preset | Model | What it pins |
+|---|---|---|
+| `fno_darcy_2d` | `darcy_fno_2d` | Canonical Darcy421, log-normal; bit-exact against the distributed data |
+| `fno_darcy_clean_2d` | `darcy_fno_2d` | The Darcy421 measure on the node grid, with no resampling |
+| `fno_darcy_piececonst_2d` | `darcy_fno_2d` | The two-phase pushforward, $\{12, 3\}$ |
+| `fno_burgers_1d` | `burgers_1d` | Sine prior at $\nu = 0.01/\pi$ |
+| `fno_burgers_grf_1d` | `burgers_1d` | The official GRF measure $N(0, 625(-\Delta + 25)^{-2})$ |
+| `fno_ns_vorticity_2d` | `ns_vorticity_2d` | Forced NS, $\nu = 10^{-3}$, $T = 50$ |
+| `burgers_smooth_1d` | `burgers_1d` | Regularity ladder, smooth end |
+| `burgers_canonical_1d` | `burgers_1d` | Regularity ladder, paper-baseline fronts |
+| `burgers_rough_1d` | `burgers_1d` | Regularity ladder, front-dominated |
+| `pdebench_burgers_1d` | `burgers_1d` | PDEBench-style low viscosity, shock-rich |
+| `kdv_dsw_1d` | `kdv_1d` | Undular bore, vigorous and un-resolvable at $n_x = 512$ |
+| `kdv_dsw_epistemic_1d` | `kdv_1d` | Undular bore, near-resolvable |
+| `mp_pde_kdv_1d` | `kdv_1d` | The Brandstetter et al. MP-PDE regime |
+| `mp_pde_kdv_easy_1d` | `kdv_1d` | The same at $T = 50$ |
+
+```python
+from pdeforge import list_presets
+from pdeforge.presets import get_preset
+
+list_presets()
+get_preset("kdv_dsw_1d")     # the full pinned configuration
+```
+
+## Model information
+
+`describe_model` reports what a model accepts without you reading its source:
 
 ```python
 from pdeforge import describe_model
 print(describe_model("burgers_1d"))
 ```
 
-This shows:
-
-- Physical parameters you can modify
-- Default values and valid ranges
-- Input/output field names
-- Backend used (spectral or FEniCSx)
+It shows the physical parameters you can modify, their defaults and valid
+ranges, the input and output field names, and the backend.

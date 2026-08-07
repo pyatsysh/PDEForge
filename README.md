@@ -129,13 +129,17 @@ PDEForge offers two installation paths because of the trade-off between simplici
 |---|---|---|
 | **Dependencies** | NumPy, SciPy, Matplotlib | + FEniCSx, PETSc, MPI, gmsh |
 | **Install time** | ~1 minute | ~1-5 minutes (with mamba) |
-| **Models available** | 14 spectral models | 18 models (+ complex geometry) |
+| **Models available** | 33 models | all 41 models (+ complex geometry) |
 | **Use case** | Most operator learning tasks | Flow around obstacles, complex domains |
 
 **Most PDE problems can be solved with spectral methods.** The basic installation covers:
-- 1D: Burgers, Heat, Wave, Allen-Cahn, FitzHugh-Nagumo, Stochastic Heat
-- 2D: Darcy flow, Stokes flow, Heat, Wave, Allen-Cahn, FitzHugh-Nagumo, Stochastic Heat
+- 1D: Burgers, KdV, Kuramoto-Sivashinsky, Heat, Wave, Advection, Allen-Cahn, FitzHugh-Nagumo, Schrödinger, Stochastic Heat, Stochastic Burgers
+- 2D: Navier-Stokes vorticity, Kolmogorov flow, Burgers, Shallow water, Darcy, Stokes, Helmholtz, Heat, Wave (uniform and heterogeneous), Allen-Cahn, FitzHugh-Nagumo, Gray-Scott, Lotka-Volterra, Stochastic Heat, Stochastic Allen-Cahn
+- 3D: Heat, Allen-Cahn, canonical Darcy
 - 2D / 3D: Cahn-Hilliard (spinodal decomposition)
+- Finite volume: transonic airfoil Euler, with a shock
+
+Every model has its own page in the [Models section](https://pyatsysh.github.io/PDEForge/models/) of the documentation.
 
 FEniCSx is only needed for **complex geometries** (e.g., flow around obstacles) where spectral methods don't apply. If you're unsure, start with the basic installation: you can always add FEniCSx later.
 

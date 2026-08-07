@@ -1,6 +1,13 @@
-# Cylinder Flow 2D Turbulent
+# Cylinder Flow 2D Turbulent (`cylinder_flow_2d_turbulent`)
 
 Time-dependent turbulent flow around a circular cylinder with **parameterized cylinder position** and **Smagorinsky LES** turbulence modeling for high Reynolds number flows.
+
+<figure class="pf-model-fig" markdown>
+<video autoplay loop muted playsinline>
+<source src="../../figures/cylinder_turbulent_motion.mp4" type="video/mp4">
+</video>
+<figcaption>Re 2000 wake vorticity with the base shear removed (<code>cylinder_flow_2d_turbulent</code>): the cylinder position is a per-sample input.</figcaption>
+</figure>
 
 ## Equations
 
