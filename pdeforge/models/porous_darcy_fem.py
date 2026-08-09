@@ -156,12 +156,8 @@ if HAS_FENICSX:
             L = fem.Constant(mesh, default_scalar_type(0.0)) * w * ufl.dx
 
             x0, x1 = self.domain.bounds["x"]
-            left = fem.locate_dofs_geometrical(
-                self.V, lambda x: np.isclose(x[0], x0)
-            )
-            right = fem.locate_dofs_geometrical(
-                self.V, lambda x: np.isclose(x[0], x1)
-            )
+            left = fem.locate_dofs_geometrical(self.V, lambda x: np.isclose(x[0], x0))
+            right = fem.locate_dofs_geometrical(self.V, lambda x: np.isclose(x[0], x1))
             bcs = [
                 fem.dirichletbc(default_scalar_type(1.0), left, self.V),
                 fem.dirichletbc(default_scalar_type(0.0), right, self.V),
@@ -211,9 +207,7 @@ if HAS_FENICSX:
 
             vel = fem.Function(self.W0v)
             vel.interpolate(
-                fem.Expression(
-                    -k * ufl.grad(ph), self.W0v.element.interpolation_points
-                )
+                fem.Expression(-k * ufl.grad(ph), self.W0v.element.interpolation_points)
             )
             p_grid = self.interpolate_to_grid(ph)  # (nx, ny)
             v_grid = self.interpolate_to_grid(vel)  # (nx, ny, 2)
@@ -230,9 +224,7 @@ if HAS_FENICSX:
                 generator_params = {}
             from pdeforge.core.registry import get_model
 
-            ch_time = float(
-                generator_params.get("ch_time", self.params["ch_time"])
-            )
+            ch_time = float(generator_params.get("ch_time", self.params["ch_time"]))
             ch = get_model("cahn_hilliard")(
                 resolution={
                     "x": self.output_resolution["x"],

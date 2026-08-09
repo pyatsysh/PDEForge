@@ -286,9 +286,7 @@ def surface_pressure(dataset: PDEDataset, index: int = 0) -> Dict[str, np.ndarra
     inp, out = dataset.inputs[index], dataset.outputs[index]
     wall = inp[:, names.index("surface")] > 0.5
     if not wall.any():
-        raise ValueError(
-            "no wall nodes in this sample; reload with keep_surface=True"
-        )
+        raise ValueError("no wall nodes in this sample; reload with keep_surface=True")
 
     xy = inp[wall][:, [names.index("x"), names.index("y")]]
     u_inf = inp[0, [names.index("u_inf_x"), names.index("u_inf_y")]]

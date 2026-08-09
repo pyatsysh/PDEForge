@@ -302,8 +302,8 @@ class Stokes2D(PDEModel):
         R_x = -self.mu * lap_u + dp_dx - fx
         R_y = -self.mu * lap_v + dp_dy - fy
 
-        momentum_x = np.linalg.norm(R_x) / max(np.linalg.norm(fx), 1e-10)
-        momentum_y = np.linalg.norm(R_y) / max(np.linalg.norm(fy), 1e-10)
+        momentum_x = float(np.linalg.norm(R_x)) / max(float(np.linalg.norm(fx)), 1e-10)
+        momentum_y = float(np.linalg.norm(R_y)) / max(float(np.linalg.norm(fy)), 1e-10)
 
         is_valid = (
             not np.isnan(solution).any()

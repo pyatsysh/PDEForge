@@ -69,9 +69,7 @@ def mesh_metrics(X: np.ndarray, Y: np.ndarray) -> Dict[str, np.ndarray]:
     ):
         njx, njy = -njx, -njy
 
-    return dict(
-        vol=vol, xc=xc, yc=yc, si=si, nix=nix, niy=niy, sj=sj, njx=njx, njy=njy
-    )
+    return dict(vol=vol, xc=xc, yc=yc, si=si, nix=nix, niy=niy, sj=sj, njx=njx, njy=njy)
 
 
 def to_primitive(U):
@@ -130,9 +128,7 @@ def hllc_flux(WL, WR, nx, ny):
         np.where(
             SM >= 0.0,
             FL + SL * (star(rL, uL, vL, pL, qL, EL, SL) - UL),
-            np.where(
-                SR >= 0.0, FR + SR * (star(rR, uR, vR, pR, qR, ER, SR) - UR), FR
-            ),
+            np.where(SR >= 0.0, FR + SR * (star(rR, uR, vR, pR, qR, ER, SR) - UR), FR),
         ),
     )
 
@@ -206,12 +202,7 @@ class EulerCGrid:
         vth = (
             self.circulation
             * beta
-            / (
-                2.0
-                * np.pi
-                * r
-                * (1.0 - self.mach**2 * np.sin(th - self.aoa) ** 2)
-            )
+            / (2.0 * np.pi * r * (1.0 - self.mach**2 * np.sin(th - self.aoa) ** 2))
         )
         return self.u_inf + vth * np.sin(th), self.v_inf - vth * np.cos(th)
 
@@ -306,9 +297,7 @@ class EulerCGrid:
 
         Fi = hllc_flux(WLi, WRi, self.g["nix"], self.g["niy"]) * self.g["si"]
         Fj = hllc_flux(WLj, WRj, self.g["njx"], self.g["njy"]) * self.g["sj"]
-        return -(
-            Fi[:, 1:] - Fi[:, :-1] + Fj[:, :, 1:] - Fj[:, :, :-1]
-        ) / self.g["vol"]
+        return -(Fi[:, 1:] - Fi[:, :-1] + Fj[:, :, 1:] - Fj[:, :, :-1]) / self.g["vol"]
 
     def local_dt(self):
         r, u, v, p = to_primitive(self.interior)

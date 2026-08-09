@@ -145,9 +145,7 @@ if HAS_FENICSX:
             )
 
         def create_function_spaces(self):
-            el_u = basix.ufl.element(
-                "Lagrange", self.mesh.basix_cell(), 2, shape=(2,)
-            )
+            el_u = basix.ufl.element("Lagrange", self.mesh.basix_cell(), 2, shape=(2,))
             el_p = basix.ufl.element("Lagrange", self.mesh.basix_cell(), 1)
             self.W = fem.functionspace(self.mesh, basix.ufl.mixed_element([el_u, el_p]))
             self.Q = fem.functionspace(self.mesh, ("Lagrange", 2))
@@ -209,9 +207,7 @@ if HAS_FENICSX:
             ly = y1 - y0
             pts = Q.tabulate_dof_coordinates()
             cond = 1.0 - (pts[:, 1] - y0) / ly
-            T_n.x.array[:] = np.clip(
-                cond + self._sample_grid_at(Q, ic), 0.0, 1.0
-            )
+            T_n.x.array[:] = np.clip(cond + self._sample_grid_at(Q, ic), 0.0, 1.0)
 
             wsol = fem.Function(W)
 
@@ -258,8 +254,8 @@ if HAS_FENICSX:
             dt = self.time_end / n_steps
             out_every = max(1, n_steps // max(1, self.n_time_steps - 1))
 
-            (u, p) = ufl.TrialFunctions(W)
-            (w, q) = ufl.TestFunctions(W)
+            u, p = ufl.TrialFunctions(W)
+            w, q = ufl.TestFunctions(W)
             ey = ufl.as_vector((0.0, 1.0))
             a_ns = (
                 (1.0 / dt) * ufl.dot(u, w) * ufl.dx
@@ -268,10 +264,9 @@ if HAS_FENICSX:
                 - p * ufl.div(w) * ufl.dx
                 - q * ufl.div(u) * ufl.dx
             )
-            L_ns = (
-                (1.0 / dt) * ufl.dot(u_n, w) * ufl.dx
-                + self.Ra * self.Pr * T_n * ufl.dot(ey, w) * ufl.dx
-            )
+            L_ns = (1.0 / dt) * ufl.dot(
+                u_n, w
+            ) * ufl.dx + self.Ra * self.Pr * T_n * ufl.dot(ey, w) * ufl.dx
 
             T = ufl.TrialFunction(Q)
             s = ufl.TestFunction(Q)
@@ -348,9 +343,7 @@ if HAS_FENICSX:
             rng = np.random.default_rng(seed)
             nx = self.output_resolution["x"]
             ny = self.output_resolution["y"]
-            amp = float(
-                generator_params.get("amplitude", self.params["perturbation"])
-            )
+            amp = float(generator_params.get("amplitude", self.params["perturbation"]))
             cutoff = int(generator_params.get("cutoff", 3))
 
             noise = rng.standard_normal((nx, ny))

@@ -70,9 +70,9 @@ def _decode_array(text: str, dtype, header_dtype, compressed: bool) -> np.ndarra
         # The header word is the first head_size bytes either way, so it can
         # be read before deciding the layout.
         n_bytes = int(
-            np.frombuffer(
-                base64.b64decode(b[:head_b64]), dtype=header_dtype, count=1
-            )[0]
+            np.frombuffer(base64.b64decode(b[:head_b64]), dtype=header_dtype, count=1)[
+                0
+            ]
         )
         # Writers differ: some emit base64(header) + base64(data) as two
         # streams (as the compressed path always does), others encode header
@@ -140,7 +140,10 @@ def read_vtk_xml(path) -> Dict[str, np.ndarray]:
             name = default_name or da.get("Name")
             if name is None:
                 continue
-            dtype = _VTK_DTYPES[da.get("type")]
+            type_name = da.get("type")
+            if type_name is None:
+                raise ValueError(f"DataArray {name!r} has no 'type' attribute")
+            dtype = _VTK_DTYPES[type_name]
             n_comp = int(da.get("NumberOfComponents", 1))
             fmt = da.get("format", "binary")
             if fmt == "ascii":

@@ -223,10 +223,10 @@ def airfoil_c_grid(
     # LE -> TE, closing back on the trailing edge.
     n_half = (n_surf + 1) // 2
     surf = naca4_coords(thickness, camber, camber_pos, n_points=n_half)
-    upper = surf[:n_half]                        # TE -> LE
-    lower = surf[n_half - 1 : 2 * n_half - 1]    # LE -> TE
+    upper = surf[:n_half]  # TE -> LE
+    lower = surf[n_half - 1 : 2 * n_half - 1]  # LE -> TE
     wall = np.vstack([lower[::-1], upper[::-1][1:]])
-    n_wall = wall.shape[0]                       # = n_surf for odd n_surf
+    n_wall = wall.shape[0]  # = n_surf for odd n_surf
 
     y_te = wall[0, 1]
     s = np.linspace(0.0, 1.0, n_wake + 1)[1:]
