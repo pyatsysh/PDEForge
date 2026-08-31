@@ -159,13 +159,24 @@ window every thickness from 0.08 to 0.28 still ripened.
     critical radius at $\bar{R}$ and makes this an exchange problem — larger
     droplet grows, smaller dissolves — rather than a dissolution problem.
 
-    That level is the *linearised* Gibbs-Thomson value, taken about $u=-1$,
-    and the droplets are lenses rather than spheres once the shell confines
-    them, so it is close to the true equilibrium but not equal to it. The
-    residue shows up as a slow net transfer of droplet material into the
-    shell matrix over a run. It does not affect which mechanism ends the pair,
-    which is what the classification reads, but it does mean the total droplet
-    volume is not itself a conserved quantity — only $\int u$ is.
+    Crucially the supersaturation is applied **uniformly**, not just inside the
+    shell. Seeding the active layer at $-1+\delta u_0$ while leaving the inert
+    core and exterior at $-1$ would put a chemical potential step across the
+    shell wall, and the frozen region is around 60% of the box — an enormous
+    sink whose mobility is small but not zero. It drains the active layer
+    steadily: with the step in place a symmetric pair lost 20% of its volume
+    by $t=0.03$ and the survivor of a ripening pair *shrank*, masking the very
+    mechanism the model exists to show. Levelling the potential removes the
+    driving force, cutting the loss to about 6% and restoring the proper
+    Ostwald signature — the larger droplet growing as the smaller dissolves.
+    What the frozen region holds is arbitrary anyway, since nothing flows
+    there once there is no gradient to drive it.
+
+    The remaining few per cent is the genuine residue: $\delta u_0$ is the
+    *linearised* Gibbs-Thomson value taken about $u=-1$, and confined droplets
+    are lenses rather than spheres, so it is close to the true equilibrium but
+    not equal to it. Total droplet volume is therefore not itself conserved —
+    only $\int u$ is, and that to machine precision.
 
 !!! note "Resolution follows epsilon"
     The interface needs about four points across it, so $\varepsilon \gtrsim
@@ -178,14 +189,23 @@ Every run is classified automatically. Connected components of $\{u>0\}$ are
 tracked frame by frame and the pair is labelled at the moment the count drops
 from two to one, using two independent signals.
 
-**Where did the material go?** Across the event the survivor either takes on
-the smaller droplet's remaining volume — which is what merging means — or it
-does not, in which case the matrix took it. This carries the primary decision,
-because it is a conservation statement across a single event rather than a
-rate, and so stays reliable however coarsely the trajectory was sampled. That
-robustness is not optional: a dissolving droplet's last moments are abrupt, so
-its final recorded volume can be large simply because the frame before it
-vanished caught it early.
+**Were they ever in contact?** The surface-to-surface gap at the last frame
+where both droplets exist, in units of $\varepsilon$, with each radius taken
+from its measured volume as $(3V/4\pi)^{1/3}$. Merging requires contact by
+definition and dissolving at a distance forbids it, so the question separates
+the mechanisms exactly. It is also the only signal that survives coarse output
+sampling — a dissolving droplet's last moments are abrupt, so its final
+recorded volume is frame-dependent, but its *distance* from its neighbour is
+not. Measured populations are far apart: pairs that merged register
+$0.6$–$1.5\,\varepsilon$, pairs that ripened $6.6\,\varepsilon$ and up.
+
+!!! warning "Asking where the material went does not work"
+    It is tempting to separate the mechanisms by asking whether the survivor
+    absorbed its partner. It does not discriminate: **in Ostwald ripening the
+    surviving droplet ends up with the material too** — that is precisely what
+    ripening is. The difference is that it arrives gradually, by diffusion
+    through the matrix, rather than all at once. The absorbed fraction is
+    reported because it is informative, but it decides nothing.
 
 **How much was left to take part?** The survival fraction
 
@@ -195,20 +215,16 @@ then grades the merger, separating a genuine merger of two healthy droplets
 from an already-dissolving remnant being mopped up. It is a continuous regime
 coordinate, not just a label:
 
-| $\rho$ | absorbed | Regime |
-|--------|----------|--------|
-| $< 0.15$ | ignored | `ripening` — nothing left to merge with |
-| $\ge 0.5$ | yes | `coalescence` |
-| $0.15$–$0.5$ | yes | `mixed` — merged, but only after substantial ripening |
-| $\ge 0.15$ | no | `ripening` |
+| contact gap | $\rho$ | Regime |
+|-------------|--------|--------|
+| $\le 3\,\varepsilon$ | $\ge 0.5$ | `coalescence` |
+| $\le 3\,\varepsilon$ | $< 0.5$ | `mixed` — touched, but only after substantial ripening |
+| $> 3\,\varepsilon$ | any | `ripening` — they never met |
 | — | pair still intact at $T$ | `unresolved` |
 
-The first row is a guard, not a tie-break. The absorbed fraction divides by
-what remains of the smaller droplet, so once that is a per cent or two of the
-original the survivor's ordinary ripening growth over a single frame is
-comparable to the whole denominator and absorption reads near 1 for reasons
-that have nothing to do with a merger. A pair that ripened down to a remnant
-ripened, whatever swallowed the last of it.
+The threshold is physical rather than fitted: diffuse interfaces interact once
+they are within about one interface thickness, $2\sqrt{2}\varepsilon =
+2.83\,\varepsilon$.
 
 Centroid approach is reported as a third, weaker signal: coalescing droplets
 migrate together, ripening ones stay put.
@@ -246,6 +262,20 @@ ic = model.generate_ic(seed=0)
 model.solve(ic)
 print(model.last_diagnostics["regime"])       # -> 'coalescence'
 ```
+
+## The two mechanisms, side by side
+
+<figure class="pf-model-fig" markdown>
+![Coarsening animation](../figures/model_eggshell_coarsening.gif)
+<figcaption>Both mechanisms on one shared clock, sliced through the plane
+containing both droplet centres. The pale annulus is the active shell and the
+dark lobed core is the egg-carton corrugation cut through the mid-plane. The
+tell is in the volume traces: coalescence takes its partner in a single jump,
+ripening receives it gradually, by diffusion.</figcaption>
+</figure>
+
+The pair shown is chosen so both events fall at nearly the same physical time,
+so what differs on screen is the mechanism rather than the pacing.
 
 ## Measured behaviour
 

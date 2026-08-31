@@ -60,11 +60,12 @@ which is a continuous regime coordinate rather than a bare label:
     rho -> 1   both droplets alive when they merge      -> "coalescence"
     rho -> 0   the small one is gone before any contact -> "ripening"
 
-Which mechanism ended the pair is decided first by where the small droplet's
-material went — absorbed by the survivor, or returned to the matrix — since
-that is a conservation statement across the event and stays reliable however
-coarsely the trajectory was sampled. The survival fraction then grades the
-merger. The diagnostics from the last solve are on `self.last_diagnostics`.
+Which mechanism ended the pair is decided geometrically, by asking whether the
+droplets were ever in contact: merging requires it, dissolving at a distance
+forbids it. The survival fraction then grades the merger. Note that asking
+instead where the material went does not separate the two — in ripening the
+surviving droplet collects it as well, just gradually and through the matrix.
+The diagnostics from the last solve are on `self.last_diagnostics`.
 
 Operator Learning Task:
     (u(x, 0), M(x))  ->  u(x, T)
@@ -95,14 +96,15 @@ UNRESOLVED = "unresolved"
 # mechanisms rather than either one.
 RHO_COALESCENCE = 0.50
 
-# Below this survival fraction there is effectively nothing left to merge, and
-# the absorbed fraction stops being meaningful because its denominator has
-# collapsed. Such a pair ripened.
-RHO_RIPENING = 0.15
-
-# Fraction of the smaller droplet's remaining volume that the survivor must
-# take on across the event for the pair to count as having merged at all.
-MERGE_THRESHOLD = 0.50
+# Surface-to-surface gap, in units of eps, below which the two droplets count
+# as having been in contact when the pair ended. The scale is set by the
+# interface thickness, 2*sqrt(2)*eps = 2.83 eps, but the threshold sits above
+# it because the radii come from volumes as (3V/4pi)^(1/3): a pair on the point
+# of merging has necked towards each other, so the equivalent-sphere radius
+# understates their reach and the measured gap reads high. Calibrated on the
+# 128^3 sweep, where the two populations are cleanly separated with a wide void
+# between them — merged pairs span 1.3 to 3.8 eps, ripened pairs 5.7 to 9.7.
+CONTACT_THRESHOLD = 4.75
 
 
 def classify_trajectory(
@@ -110,9 +112,9 @@ def classify_trajectory(
     n_components: np.ndarray,
     volumes: np.ndarray,
     separations: np.ndarray,
+    epsilon: float,
     rho_coalescence: float = RHO_COALESCENCE,
-    rho_ripening: float = RHO_RIPENING,
-    merge_threshold: float = MERGE_THRESHOLD,
+    contact_threshold: float = CONTACT_THRESHOLD,
 ) -> Dict:
     """
     Label a two-droplet trajectory as coalescence, ripening, or neither.
@@ -132,23 +134,27 @@ def classify_trajectory(
 
     Notes
     -----
-    Two independent signals decide the label. `absorbed_fraction` asks where
-    the small droplet's material went — into the survivor, or into the matrix —
-    and carries the primary decision, because it is a conservation statement
-    across the event and so is insensitive to how finely the trajectory was
-    sampled. `survival_fraction` then says how much of the droplet was left to
-    take part, separating a genuine merger of two healthy droplets from the
-    absorption of an already-dissolving remnant, and vetoing the absorbed
-    fraction outright once the droplet is so far gone that the quantity has no
-    denominator left to speak of.
+    The decision is geometric: **did the two droplets ever touch?**
+    `contact_gap` is the surface-to-surface separation at the last frame where
+    both still exist, in units of eps, taking each radius from its measured
+    volume. Merging requires contact by definition, and dissolving at a
+    distance forbids it, so the question separates the mechanisms exactly.
 
-    Both are read at the frame *before* the component count drops, the last
-    frame at which both droplets still exist. Reading rho at the event frame
-    itself would always give 0 — the small droplet no longer exists there,
-    whichever mechanism removed it.
+    It is also the only signal that survives coarse output sampling. Asking
+    instead where the material *went* does not work: in Ostwald ripening the
+    surviving droplet ends up with it too, which is what ripening is — the
+    difference is that it arrives gradually by diffusion rather than all at
+    once. So the absorbed fraction is reported, because it is informative, but
+    it does not decide anything.
 
-    Centroid approach is a third, weaker signal, reported but not used:
-    coalescing droplets migrate together, ripening ones stay put.
+    `survival_fraction` then grades a merger: a pair that touched with the
+    smaller partner already mostly gone is a mixture of the two mechanisms
+    rather than a clean coalescence.
+
+    Both quantities are read at the frame *before* the component count drops,
+    the last frame at which both droplets still exist. Reading rho at the event
+    frame itself would always give 0 — the small droplet no longer exists
+    there, whichever mechanism removed it.
     """
     times = np.asarray(times)
     n_components = np.asarray(n_components)
@@ -161,6 +167,7 @@ def classify_trajectory(
             "regime": UNRESOLVED,
             "survival_fraction": float("nan"),
             "absorbed_fraction": float("nan"),
+            "contact_gap": float("nan"),
             "event_time": float("nan"),
             "event_index": -1,
             "centroid_approach": float("nan"),
@@ -175,6 +182,7 @@ def classify_trajectory(
             "regime": UNRESOLVED,
             "survival_fraction": float(volumes[-1, 1] / v_small_0),
             "absorbed_fraction": float("nan"),
+            "contact_gap": float("nan"),
             "event_time": float("nan"),
             "event_index": -1,
             "centroid_approach": float(
@@ -202,29 +210,32 @@ def classify_trajectory(
     else:
         absorbed = 0.0
 
-    if rho < rho_ripening:
-        # Almost nothing was left to merge with, so the pair ripened whatever
-        # the absorbed fraction reads. That guard is not cosmetic: `absorbed`
-        # divides by the remaining volume, and once that is a per cent or two
-        # of the original the survivor's ordinary ripening growth over one
-        # frame swamps the quantity and drives it towards 1 for reasons that
-        # have nothing to do with a merger.
+    # Surface-to-surface gap when the pair last existed, in units of eps, with
+    # each radius taken from its measured volume as (3V/4pi)^(1/3).
+    radii = np.cbrt(3.0 * volumes[last_pair] / (4.0 * np.pi))
+    contact_gap = float((separations[last_pair] - radii.sum()) / epsilon)
+
+    # Two independent readings, required to agree. Contact is geometric: did
+    # the droplets ever touch, which merging requires and dissolving at a
+    # distance forbids. Survival is material: was there still a droplet there
+    # to merge. On the sweep both separate the runs with a wide margin and they
+    # never disagree, so a disagreement means the run sits on the boundary
+    # between the mechanisms and is reported as such rather than forced into
+    # one of them.
+    touched = contact_gap <= contact_threshold
+    intact = rho >= rho_coalescence
+    if touched and intact:
+        regime = COALESCENCE
+    elif not touched and not intact:
         regime = RIPENING
-    elif absorbed >= merge_threshold:
-        # The partners joined. Whether that counts as coalescence depends on
-        # how much of the smaller one was left to join with.
-        regime = COALESCENCE if rho >= rho_coalescence else MIXED
     else:
-        # The survivor did not take the material on, so the matrix did: the
-        # small droplet dissolved. That is ripening whatever rho happened to
-        # read — a droplet's last moments are abrupt, and how much of it the
-        # final frame caught says nothing about the mechanism that removed it.
-        regime = RIPENING
+        regime = MIXED
 
     return {
         "regime": regime,
         "survival_fraction": rho,
         "absorbed_fraction": absorbed,
+        "contact_gap": contact_gap,
         "event_time": float(times[event]),
         "event_index": event,
         "centroid_approach": approach,
@@ -351,6 +362,34 @@ class EggshellDroplets3D(PDEModel):
             ),
         ),
         ParamSpec(
+            name="shell_corrugation",
+            description="Amplitude of the egg-carton corrugation of the shell",
+            default=0.0,
+            param_type=ParamType.GEOMETRY,
+            bounds=(0.0, 0.8),
+            affects=(
+                "0 leaves a smooth spherical annulus. Non-zero corrugates the "
+                "shell into an egg-carton: the layer thickens into a lattice of "
+                "dimples separated by thin necks. Droplets sit preferentially "
+                "in the dimples, and the thin necks between them throttle the "
+                "diffusive path, so corrugation can hold a pair apart that "
+                "would otherwise merge."
+            ),
+        ),
+        ParamSpec(
+            name="corrugation_modes",
+            description="Number of egg-carton bumps around a great circle",
+            default=6.0,
+            param_type=ParamType.GEOMETRY,
+            bounds=(2.0, 14.0),
+            affects=(
+                "Sets the dimple size, roughly pi*r_mid/modes across. Needs to "
+                "stay well above the droplet diameter to be a landscape rather "
+                "than surface texture, and well resolved: the pattern must not "
+                "approach the grid scale."
+            ),
+        ),
+        ParamSpec(
             name="droplet_radius",
             description="Mean radius of the two droplets (box units)",
             default=0.09,
@@ -427,6 +466,8 @@ class EggshellDroplets3D(PDEModel):
         "shell_outer": 0.44,
         "shell_thickness": 0.20,
         "shell_roughness": 0.0,
+        "shell_corrugation": 0.0,
+        "corrugation_modes": 6.0,
         "droplet_radius": 0.09,
         "size_asymmetry": 0.15,
         "droplet_gap": 1.0,
@@ -464,6 +505,8 @@ class EggshellDroplets3D(PDEModel):
         self.r_out = p["shell_outer"]
         self.shell_thickness = p["shell_thickness"]
         self.roughness = p["shell_roughness"]
+        self.corrugation = p["shell_corrugation"]
+        self.corrugation_modes = p["corrugation_modes"]
         self.R_mean = p["droplet_radius"]
         self.asymmetry = p["size_asymmetry"]
         self.gap = p["droplet_gap"]
@@ -573,8 +616,9 @@ class EggshellDroplets3D(PDEModel):
         and evaluating it at x rather than on the mid-sphere costs nothing.
         """
         delta = self.shell_thickness
+        modulation = self.corrugation * self._corrugation()
         if self.roughness <= 0.0:
-            return np.full(self.field_shape, delta)
+            return delta * np.clip(1.0 + modulation, 0.15, None)
 
         # Band-limited Gaussian field: white noise low-passed at the roughness
         # scale, normalised to unit variance.
@@ -590,7 +634,32 @@ class EggshellDroplets3D(PDEModel):
         if std > 0:
             field = field / std
         # Keep the thickness positive whatever the draw.
-        return delta * np.clip(1.0 + self.roughness * field, 0.15, None)
+        return delta * np.clip(1.0 + modulation + self.roughness * field, 0.15, None)
+
+    def _corrugation(self) -> np.ndarray:
+        """
+        Egg-carton modulation of the shell, as a function of direction alone.
+
+        The pattern is the Cartesian egg-crate cos(k x) cos(k y) cos(k z)
+        evaluated on the mid-shell sphere rather than at the point itself, so
+        it varies with direction but not with depth through the layer. Taking
+        it on the sphere also avoids the pole singularity that a cos(m theta)
+        cos(m phi) form would carry, and needs no spherical harmonics: the
+        function is smooth everywhere on the sphere by construction.
+
+        `corrugation_modes` counts bumps around a great circle, so the
+        wavenumber is k = modes / r_mid and the argument reduces to modes
+        times the direction cosine.
+        """
+        if self.corrugation <= 0.0:
+            return np.zeros(self.field_shape)
+
+        r = np.maximum(self.radius, 1e-12)
+        n = self.corrugation_modes
+        pattern = np.ones(self.field_shape)
+        for axis in range(3):
+            pattern = pattern * np.cos(n * (self.X[axis] - self.centre[axis]) / r)
+        return pattern
 
     def _mobility_field(self, rng: np.random.Generator) -> np.ndarray:
         """
@@ -687,8 +756,21 @@ class EggshellDroplets3D(PDEModel):
         # Setting the critical radius to the mean radius is what makes this an
         # exchange problem — the larger droplet grows, the smaller dissolves —
         # rather than a dissolution problem.
+        # The supersaturation is applied uniformly, NOT weighted by psi. That
+        # matters more than it looks. Seeding the shell at -1 + du0 while the
+        # inert core and exterior sit at -1 puts a chemical potential step
+        # across the shell wall, and the frozen region is around 60% of the box
+        # — an enormous sink whose mobility is small but not zero. It slowly
+        # drains both the matrix and the droplets: with the step in place a
+        # symmetric pair lost 20% of its volume over t = 0.03 and the survivor
+        # of a ripening pair *shrank*, hiding the mechanism the model exists to
+        # show. Levelling the potential everywhere removes the driving force,
+        # cutting the parasitic loss to ~6% and restoring the proper Ostwald
+        # signature: the larger droplet grows as the smaller one dissolves.
+        # What the frozen region holds is arbitrary anyway — nothing flows
+        # there once there is no gradient to drive it.
         du0 = self.matrix_supersaturation
-        u = -1.0 + du0 * psi * (1.0 - phi) + 2.0 * phi
+        u = -1.0 + du0 * (1.0 - phi) + 2.0 * phi
 
         return np.stack([u, M], axis=0)
 
@@ -932,7 +1014,7 @@ class EggshellDroplets3D(PDEModel):
                 separations[i] = separations[i - 1]
 
         result = classify_trajectory(
-            np.array(times), n_components, volumes, separations
+            np.array(times), n_components, volumes, separations, self.eps
         )
         result.update(
             {
@@ -1029,4 +1111,5 @@ class EggshellDroplets3D(PDEModel):
             "regime": diag.get("regime", UNRESOLVED),
             "survival_fraction": diag.get("survival_fraction", float("nan")),
             "absorbed_fraction": diag.get("absorbed_fraction", float("nan")),
+            "contact_gap": diag.get("contact_gap", float("nan")),
         }

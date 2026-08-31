@@ -97,12 +97,22 @@ class TestGeometryAndIC:
         assert M[outside].max() < 0.01 * m.mobility
 
     def test_droplet_phase_confined_to_the_shell(self):
-        """No droplet material is seeded in the inert core or outside."""
+        """
+        No droplet material is seeded in the inert core or outside.
+
+        The frozen region sits at the same level as the shell matrix, not at
+        exactly -1: levelling the chemical potential across the shell wall is
+        what stops the inert bulk, some 60% of the box, from slowly draining
+        the active layer. So the check is that it holds no droplet phase, and
+        sits at the matrix level, rather than that it equals the bare well.
+        """
         m = build()
         ic = m.generate_ic(seed=0)
         u, M = ic
         frozen = M < 0.01 * m.mobility
-        assert np.all(u[frozen] < -0.95)
+        assert u[frozen].max() < 0.0, "no droplet phase outside the active shell"
+        matrix_level = -1.0 + m.matrix_supersaturation
+        assert np.allclose(u[frozen], matrix_level, atol=1e-3)
 
 
 class TestExactInvariants:
@@ -269,15 +279,19 @@ class TestGibbsThomson:
 class TestClassifier:
     """The classifier is a pure function, so it is tested on synthetic input."""
 
-    def _traj(self, n_comp, v_small, merges, sep=None):
-        """
-        Build a conservation-consistent synthetic trajectory.
+    EPS = 0.02
 
-        The survivor holds volume 1.0 while the pair lasts. `merges` says
-        whether the event was a merger: if it was, the survivor takes on the
-        smaller droplet's remaining volume, which is exactly the signal the
-        classifier keys on. A "merge" in which the survivor gains nothing is
-        not a merge, so the fixtures may not fabricate one.
+    def _traj(self, n_comp, v_small, merges, touching=None):
+        """
+        Build a geometrically consistent synthetic trajectory.
+
+        The survivor holds volume 1.0 while the pair lasts, and if `merges` it
+        takes on the smaller droplet's remaining volume. Separations are built
+        from the radii so the surface-to-surface gap is physical: `touching`
+        puts the pair in contact (the geometry a merger requires), otherwise it
+        sets them far apart. Defaults to `merges`, since a pair cannot merge
+        without touching, but the two can be set independently to check that
+        the classifier keys on contact rather than on the volume bookkeeping.
         """
         n_t = len(n_comp)
         v_small = np.asarray(v_small, dtype=float)
@@ -286,8 +300,12 @@ class TestClassifier:
         if gone.size and merges:
             v_large[gone[0] :] = 1.0 + v_small[gone[0] - 1]
         volumes = np.stack([v_large, v_small], axis=1)
-        sep = sep if sep is not None else np.full(n_t, 0.5)
-        return (np.linspace(0, 1, n_t), np.asarray(n_comp), volumes, np.asarray(sep))
+
+        touching = merges if touching is None else touching
+        radii = np.cbrt(3.0 * volumes / (4.0 * np.pi)).sum(axis=1)
+        # 1 eps of clearance reads as contact; 10 eps is unambiguously apart.
+        sep = radii + self.EPS * (1.0 if touching else 10.0)
+        return (np.linspace(0, 1, n_t), np.asarray(n_comp), volumes, sep, self.EPS)
 
     def test_merge_with_both_alive_is_coalescence(self):
         r = classify_trajectory(
@@ -319,30 +337,48 @@ class TestClassifier:
         assert r["regime"] == UNRESOLVED
         assert r["survival_fraction"] == pytest.approx(0.7)
 
-    def test_absorption_signal_survives_coarse_frames(self):
+    def test_contact_survives_coarse_frames(self):
         """
-        The frame-rate robustness that motivates `absorbed_fraction`. A droplet
+        The frame-rate robustness that motivates deciding on contact. A droplet
         that ripens away vanishes abruptly, so with coarse sampling its last
-        recorded volume can still be large. Survival fraction alone would then
-        read that as a merger; the absorption signal does not, because the
-        survivor never took the material on.
+        recorded volume can still be large — here 0.47, which taken alone reads
+        like a healthy merger. Geometry is not fooled: the pair was never in
+        contact, so nothing could have bridged.
         """
         r = classify_trajectory(*self._traj([2, 2, 1], [1.0, 0.47, 0.0], merges=False))
         assert r["survival_fraction"] == pytest.approx(0.47)
+        assert r["contact_gap"] > 3.0
         assert r["regime"] == RIPENING
 
-    def test_remnant_absorption_after_ripening_is_not_a_merger(self):
+    def test_absorption_alone_does_not_imply_a_merger(self):
         """
-        The guard on the absorbed fraction. Once the small droplet is down to a
-        per cent of its original volume the quantity has no denominator left to
-        speak of: the survivor's ordinary ripening growth over a single frame
-        is comparable to everything that remains, so absorption reads near 1
-        for reasons that have nothing to do with a merger. A pair that ripened
-        away to a remnant ripened, whatever swallowed the last of it.
+        Why the absorbed fraction cannot carry the decision. In Ostwald
+        ripening the surviving droplet collects the material too — that is what
+        ripening is — so a high absorbed fraction is perfectly compatible with
+        a pair that never touched, and is no evidence of coalescence.
         """
-        r = classify_trajectory(*self._traj([2, 2, 1], [1.0, 0.011, 0.0], merges=True))
-        assert r["absorbed_fraction"] > 0.5
-        assert r["regime"] == RIPENING
+        r = classify_trajectory(
+            *self._traj([2, 2, 1], [1.0, 0.05, 0.0], merges=True, touching=False)
+        )
+        assert r["absorbed_fraction"] > 0.5, "survivor did take the material"
+        assert r["regime"] == RIPENING, "but they were never in contact"
+
+    def test_disagreeing_signals_are_reported_not_forced(self):
+        """
+        Contact and survival are independent readings and the sweep never sees
+        them disagree. When they do, the run sits between the mechanisms and
+        should be labelled so, rather than silently resolved in favour of
+        whichever signal happens to be consulted first.
+        """
+        apart_but_intact = classify_trajectory(
+            *self._traj([2, 2, 1], [1.0, 0.9, 0.0], merges=False, touching=False)
+        )
+        assert apart_but_intact["regime"] == MIXED
+
+        touching_but_spent = classify_trajectory(
+            *self._traj([2, 2, 1], [1.0, 0.02, 0.0], merges=True, touching=True)
+        )
+        assert touching_but_spent["regime"] == MIXED
 
     def test_regime_read_before_the_event_not_at_it(self):
         """
@@ -353,16 +389,16 @@ class TestClassifier:
         assert r["survival_fraction"] == pytest.approx(1.0)
         assert r["regime"] == COALESCENCE
 
-    def test_centroid_approach_is_an_independent_signal(self):
-        """Coalescing droplets move together; ripening ones stay put."""
+    def test_contact_gap_separates_the_two_geometries(self):
+        """Touching pairs sit inside the threshold; distant ones well outside."""
         merging = classify_trajectory(
-            *self._traj([2, 2, 1], [1.0, 0.9, 0.0], merges=True, sep=[0.5, 0.25, 0.25])
+            *self._traj([2, 2, 1], [1.0, 0.9, 0.0], merges=True, touching=True)
         )
         ripening = classify_trajectory(
-            *self._traj([2, 2, 1], [1.0, 0.05, 0.0], merges=False, sep=[0.5, 0.5, 0.5])
+            *self._traj([2, 2, 1], [1.0, 0.05, 0.0], merges=False, touching=False)
         )
-        assert merging["centroid_approach"] > 0.4
-        assert ripening["centroid_approach"] == pytest.approx(0.0)
+        assert merging["contact_gap"] < 3.0
+        assert ripening["contact_gap"] > 3.0
 
 
 class TestRegimesAreReachable:
