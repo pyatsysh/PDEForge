@@ -228,6 +228,43 @@ def allen_cahn_3d():
             "u at four z-slices, partway through coarsening")
 
 
+def eggshell_droplets_3d():
+    # The subject of this model is the dichotomy, not one trajectory, so the
+    # figure runs both regimes and shows each one's start and end. The slice
+    # is the plane y = centre, the only plane containing both droplet centres.
+    from pdeforge import get_model
+
+    def run(**kw):
+        m = get_model("eggshell_droplets_3d")(
+            resolution={"x": 96, "y": 96, "z": 96}, epsilon=0.0135, **kw
+        )
+        ic = m.generate_ic(seed=0)
+        uT = m.solve(ic)
+        mid = ic[0].shape[1] // 2
+        return ic[0][:, mid, :], uT[:, mid, :], m.last_diagnostics["regime"]
+
+    # Equal partners already touching: no ripening drive, so they can only merge.
+    c0, c1, c_regime = run(size_asymmetry=0.0, droplet_gap=0.15, time_end=0.05)
+    # Unequal partners held apart: Gibbs-Thomson dissolves the smaller one.
+    # Stopped shortly after the event (t ~ 0.03): run much further and the shell
+    # matrix slowly eats the survivor too, which is a separate, slower story.
+    r0, r1, r_regime = run(size_asymmetry=0.30, droplet_gap=1.0, time_end=0.06)
+
+    fig = _canvas()
+    axes = _axes(fig, 4)
+    panels = [c0, c1, r0, r1]
+    both = np.concatenate([p.ravel() for p in panels])
+    lim = _sym(both)
+    for ax, field in zip(axes, panels):
+        ax.imshow(field, cmap=NORD_GLOW, origin="lower",
+                  interpolation="bilinear", aspect="auto", **lim)
+    _label(axes[0], "equal pair, touching")
+    _label(axes[1], f"-> {c_regime}")
+    _label(axes[2], "unequal pair, apart")
+    _label(axes[3], f"-> {r_regime}")
+    _save(fig, "eggshell_droplets_3d")
+
+
 def burgers_2d():
     d = _gen("burgers_2d", resolution={"x": 256, "y": 256},
              params={"viscosity": 0.002, "time_horizon": 1.0}, seed=11)
@@ -533,6 +570,7 @@ def cylinder_flow_2d_parameterized():
 
 SPECTRAL = [
     advection_1d, allen_cahn_1d, allen_cahn_3d, burgers_2d, darcy_fno_2d,
+    eggshell_droplets_3d,
     fitzhugh_nagumo_1d, fitzhugh_nagumo_2d, heat_1d, heat_2d, heat_3d,
     helmholtz_2d, kdv_1d, lotka_volterra_2d, ns_vorticity_2d, schrodinger_1d,
     shallow_water_2d, wave_1d, wave_2d, stochastic_burgers_1d,

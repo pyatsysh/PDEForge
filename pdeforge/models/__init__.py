@@ -18,6 +18,7 @@ from pdeforge.models import (
     darcy_2d,
     darcy_fno_2d,
     darcy_fno_3d,
+    eggshell_droplets_3d,
     fitzhugh_nagumo_1d,
     fitzhugh_nagumo_2d,
     gray_scott_2d,
@@ -48,6 +49,7 @@ from pdeforge.models.allen_cahn_2d import AllenCahn2D
 from pdeforge.models.burgers_1d import Burgers1D
 from pdeforge.models.cahn_hilliard import CahnHilliard
 from pdeforge.models.darcy_2d import Darcy2D
+from pdeforge.models.eggshell_droplets_3d import EggshellDroplets3D
 from pdeforge.models.fitzhugh_nagumo_1d import FitzHughNagumo1D
 from pdeforge.models.fitzhugh_nagumo_2d import FitzHughNagumo2D
 from pdeforge.models.heat_1d import Heat1D
@@ -77,6 +79,8 @@ __all__ = [
     "AllenCahn2D",
     # Cahn-Hilliard (spinodal decomposition, 2D/3D)
     "CahnHilliard",
+    # Cahn-Hilliard (two droplets in an egg-shell pellet, 3D)
+    "EggshellDroplets3D",
     # Stochastic Heat
     "StochasticHeat1D",
     "StochasticHeat2D",

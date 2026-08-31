@@ -29,7 +29,7 @@ Every sample draws its own airfoil (thickness, camber, angle of attack), the
 channel is re-meshed, the flow is solved, and the dataset (SDF geometry
 channel, velocity/pressure fields, lift/drag coefficients, full provenance
 metadata) lands in `./data/naca`. No compiler, no conda, no PETSc build.
-The same command works for every one of the 41 models, and
+The same command works for every one of the 42 models, and
 `pdeforge reproduce metadata.json` regenerates any dataset bit-for-bit:
 the container pins the environment, the metadata pins the run.
 
@@ -129,7 +129,7 @@ PDEForge offers two installation paths because of the trade-off between simplici
 |---|---|---|
 | **Dependencies** | NumPy, SciPy, Matplotlib | + FEniCSx, PETSc, MPI, gmsh |
 | **Install time** | ~1 minute | ~1-5 minutes (with mamba) |
-| **Models available** | 33 models | all 41 models (+ complex geometry) |
+| **Models available** | 33 models | all 42 models (+ complex geometry) |
 | **Use case** | Most operator learning tasks | Flow around obstacles, complex domains |
 
 **Most PDE problems can be solved with spectral methods.** The basic installation covers:
@@ -606,6 +606,7 @@ print(describe_model("burgers_1d"))
 | `allen_cahn_2d` | Phase separation (bistable) | 2D | Spectral |
 | `allen_cahn_3d` | Phase separation (bistable) | 3D | Spectral (+JAX) |
 | `cahn_hilliard` | Spinodal decomposition (conserved) | 2D / 3D | Spectral |
+| `eggshell_droplets_3d` | Coalescence vs Ostwald ripening in a shell | 3D | Spectral |
 | `gray_scott_2d` | Pattern formation (Pearson regimes) | 2D | Spectral (+JAX) |
 | `lotka_volterra_2d` | Diffusive predator-prey | 2D | Spectral (+JAX) |
 | `fitzhugh_nagumo_1d` | Excitable media (neurons) | 1D | Spectral |

@@ -106,6 +106,7 @@ nav:
           - Allen-Cahn 2D: models/allen_cahn_2d.md
           - Allen-Cahn 3D: models/allen_cahn_3d.md
           - Cahn-Hilliard: models/cahn_hilliard.md
+          - Egg-shell droplets: models/eggshell_droplets_3d.md
           - Gray-Scott 2D: models/gray_scott_2d.md
           - FitzHugh-Nagumo 1D: models/fitzhugh_nagumo_1d.md
           - FitzHugh-Nagumo 2D: models/fitzhugh_nagumo_2d.md

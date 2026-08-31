@@ -76,6 +76,7 @@ benefits at long horizons.
 | [`allen_cahn_2d`](../models/allen_cahn_2d.md) | curvature-driven coarsening |
 | [`allen_cahn_3d`](../models/allen_cahn_3d.md) | the same on the cube |
 | [`cahn_hilliard`](../models/cahn_hilliard.md) | spinodal decomposition, 2D or 3D |
+| [`eggshell_droplets_3d`](../models/eggshell_droplets_3d.md) | which coarsening mechanism wins, in a catalyst shell |
 | [`gray_scott_2d`](../models/gray_scott_2d.md) | the Pearson parameter plane |
 | [`fitzhugh_nagumo_1d`](../models/fitzhugh_nagumo_1d.md) | excitable pulses past a threshold |
 | [`fitzhugh_nagumo_2d`](../models/fitzhugh_nagumo_2d.md) | broken fronts, spirals |

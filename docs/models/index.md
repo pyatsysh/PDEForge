@@ -135,6 +135,7 @@ supplied in the input.
 | [`allen_cahn_2d`](allen_cahn_2d.md) | curvature-driven coarsening | spectral |
 | [`allen_cahn_3d`](allen_cahn_3d.md) | the same on the cube | spectral |
 | [`cahn_hilliard`](cahn_hilliard.md) | spinodal decomposition, 2D or 3D, mean conserved | spectral |
+| [`eggshell_droplets_3d`](eggshell_droplets_3d.md) | coalescence vs Ostwald ripening, two droplets in a shell | spectral |
 | [`gray_scott_2d`](gray_scott_2d.md) | the Pearson parameter plane | spectral / JAX |
 | [`fitzhugh_nagumo_1d`](fitzhugh_nagumo_1d.md) | excitable pulses past a threshold | spectral |
 | [`fitzhugh_nagumo_2d`](fitzhugh_nagumo_2d.md) | broken fronts, spirals, and when they die | spectral |
