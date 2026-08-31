@@ -79,7 +79,7 @@ from typing import Callable, Dict, Optional, Tuple, Union
 import numpy as np
 from scipy import ndimage
 
-from pdeforge.core.base import PDEModel
+from pdeforge.core.base import PDEModel, _legacy_seed, _seed_sequence
 from pdeforge.core.params import ParamSpec, ParamType
 from pdeforge.core.registry import register_model
 
@@ -344,10 +344,10 @@ class EggshellDroplets3D(PDEModel):
             param_type=ParamType.INPUT,
             bounds=(0.0, 0.6),
             affects=(
-                "0 gives a perfect shell, which is homogeneous by symmetry and "
-                "exerts no migration force. Non-zero makes the shell thickness "
-                "a random field, and droplets drift towards thicker regions — "
-                "the realistic case for an impregnated pellet."
+                "0 gives a perfect, sample-independent shell. Non-zero makes "
+                "the shell thickness a random field, so the confining geometry "
+                "differs per sample and the mobility channel becomes a genuine "
+                "input — the realistic case for an impregnated pellet."
             ),
         ),
         ParamSpec(
@@ -368,9 +368,11 @@ class EggshellDroplets3D(PDEModel):
             param_type=ParamType.INPUT,
             bounds=(0.0, 0.5),
             affects=(
-                "The Ostwald ripening drive. Zero means the partners are "
-                "identical and no ripening can occur; large values dissolve the "
-                "small droplet before it can ever touch its neighbour."
+                "The Ostwald ripening drive, sigma*(1/R2 - 1/R1). Zero means "
+                "identical partners and no drive at all — an unstable "
+                "equilibrium, not a regime; larger values dissolve the small "
+                "droplet faster and pull the coalescence boundary to smaller "
+                "gaps."
             ),
         ),
         ParamSpec(
@@ -689,6 +691,51 @@ class EggshellDroplets3D(PDEModel):
         u = -1.0 + du0 * psi * (1.0 - phi) + 2.0 * phi
 
         return np.stack([u, M], axis=0)
+
+    def generate_sample(
+        self,
+        generator: Union[str, Callable] = "fourier",
+        generator_params: Dict = None,
+        seed: int = None,
+        validate: bool = True,
+        max_attempts: int = 10,
+        return_full: bool = False,
+    ) -> Tuple[np.ndarray, np.ndarray, Dict]:
+        """
+        Base-class contract, plus a seed for the conserved noise.
+
+        The base implementation seeds `generate_ic` but calls `solve` bare, so
+        with `noise_intensity > 0` the dataset path would draw an unseeded
+        noise stream and `generate_dataset(seed=...)` would not reproduce.
+        This override forwards a per-attempt noise seed to `solve`, following
+        the stochastic models' convention. The IC seed is derived exactly as
+        the base class derives it, so deterministic datasets are unchanged;
+        the noise seed comes from a spawned child of the same SeedSequence, so
+        the two streams are independent rather than identical.
+        """
+        if generator_params is None:
+            generator_params = {}
+
+        attempt_seqs = _seed_sequence(seed).spawn(max_attempts)
+        for attempt in range(max_attempts):
+            seq = attempt_seqs[attempt]
+            ic_seed = _legacy_seed(seq) if seed is not None else None
+            noise_seed = _legacy_seed(seq.spawn(1)[0]) if seed is not None else None
+
+            ic = self.generate_ic(
+                generator=generator,
+                generator_params=generator_params,
+                seed=ic_seed,
+            )
+            solution = self.solve(ic, return_full=return_full, seed=noise_seed)
+
+            if not validate:
+                return ic, solution, {"valid": True}
+            validation = self.validate_solution(ic, solution)
+            if validation["valid"]:
+                return ic, solution, validation
+
+        raise RuntimeError("sample generation failed")
 
     # ------------------------------------------------------------------
     # Solver

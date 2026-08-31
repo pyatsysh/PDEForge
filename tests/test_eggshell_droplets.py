@@ -435,6 +435,31 @@ class TestDatasetIntegration:
         # a constant the surrogate could absorb into its weights.
         assert not np.allclose(d.inputs[0, 1], d.inputs[1, 1])
 
+    def test_noise_is_seed_reproducible_through_the_dataset_path(self):
+        """
+        The realization-pattern guarantee. The base `generate_sample` calls
+        `solve` without a seed, so without the override the conserved-noise
+        stream would be irreproducible exactly where reproducibility matters
+        most — generating a stochastic dataset. Same seed must mean identical
+        arrays; a different seed must not.
+        """
+        import pdeforge
+
+        kw = dict(
+            n_samples=2,
+            resolution={"x": 64, "y": 64, "z": 64},
+            params=dict(noise_intensity=1e-6, shell_roughness=0.35, **self.FAST),
+            seed=5,
+            verbose=False,
+        )
+        a = pdeforge.generate_dataset("eggshell_droplets_3d", **kw)
+        b = pdeforge.generate_dataset("eggshell_droplets_3d", **kw)
+        assert np.array_equal(a.inputs, b.inputs)
+        assert np.array_equal(a.outputs, b.outputs)
+
+        c = pdeforge.generate_dataset("eggshell_droplets_3d", **{**kw, "seed": 6})
+        assert not np.array_equal(a.outputs, c.outputs)
+
     def test_trajectory_output_carries_a_time_grid(self):
         import pdeforge
 
